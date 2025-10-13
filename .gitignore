@@ -1,0 +1,39 @@
+cat > .gitignore << 'EOF'
+# Virtual Environment
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Flask
+instance/
+
+# Environment
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Data
+data/cache/*
+data/exports/*
+!data/cache/.gitkeep
+!data/exports/.gitkeep
+
+# Logs
+logs/*.log
+
+# ML Models
+*.h5
+*.pkl
+data/models/*
+
+# Database
+*.db
+*.sqlite
+EOF

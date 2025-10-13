@@ -1,0 +1,187 @@
+﻿from flask import Flask, jsonify, request
+from flask_cors import CORS
+from flask_jwt_extended import JWTManager
+from flask_bcrypt import Bcrypt
+from config import config
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from database.models import db
+from features.auth import auth_bp, jwt, bcrypt
+from features.watchlist import watchlist_bp
+from features.alerts import alerts_bp
+from features.portfolio import portfolio_bp
+from data_fetchers.live_stock_fetcher import LiveStockFetcher
+from data_fetchers.price_fetcher import RealTimePriceFetcher
+from ai_engine.technical_analyzer import TechnicalAnalyzer
+from ai_engine.advanced_lstm import AdvancedStockPredictor
+from ai_engine.feature_engineer import FeatureEngineer
+from utils.cache import cached
+
+
+def create_app(config_name='development'):
+    app = Flask(__name__)
+    app.config.from_object(config[config_name])
+
+    # JWT Secret Key
+    app.config['JWT_SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
+
+    # Initialize extensions
+    CORS(app)
+    db.init_app(app)
+    jwt.init_app(app)
+    bcrypt.init_app(app)
+
+    # Register blueprints
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
+    app.register_blueprint(watchlist_bp, url_prefix='/api/watchlist')
+    app.register_blueprint(alerts_bp, url_prefix='/api/alerts')
+    app.register_blueprint(portfolio_bp, url_prefix='/api/portfolio')
+
+    # Initialize modules - UPDATED
+    stock_fetcher = LiveStockFetcher()
+    price_fetcher = RealTimePriceFetcher()
+    tech_analyzer = TechnicalAnalyzer()
+    predictor = AdvancedStockPredictor()  # NEW: Advanced predictor
+    feature_engineer = FeatureEngineer()  # NEW: Feature engineer
+
+    @app.route('/api/health')
+    def health():
+        return jsonify({'status': 'online', 'app': 'StockPulse', 'version': '3.0.0'})
+
+    @app.route('/api/stocks/list/<exchange>')
+    def get_stocks(exchange):
+        stocks = stock_fetcher.fetch_nse_stocks() if exchange.upper() == 'NSE' else stock_fetcher.fetch_bse_stocks()
+        return jsonify({'exchange': exchange, 'total': len(stocks), 'stocks': stocks})
+
+    @app.route('/api/stocks/search')
+    def search_stocks():
+        query = request.args.get('q', '')
+        exchange = request.args.get('exchange', 'NSE')
+
+        if len(query) < 2:
+            return jsonify({'results': []})
+
+        results = stock_fetcher.search_stock(query, exchange)
+        return jsonify({'results': results})
+
+    @cached(ttl=300)
+    def get_cached_analysis(symbol, exchange):
+        try:
+            # Get 2 years of data for better training
+            hist_data = price_fetcher.get_historical_data(symbol, exchange, period='2y')
+
+            if hist_data is None or hist_data.empty:
+                return None
+
+            # Feature engineering - NEW
+            print(f"Creating features for {symbol}...")
+            hist_data = feature_engineer.create_features(hist_data)
+            hist_data = hist_data.dropna()
+
+            if len(hist_data) < 100:
+                print(f"Insufficient data after feature engineering: {len(hist_data)}")
+                return None
+
+            # Calculate technical indicators for display
+            hist_data = tech_analyzer.calculate_indicators(hist_data)
+
+            current_price = float(hist_data['Close'].iloc[-1])
+            prev_price = float(hist_data['Close'].iloc[-2])
+
+            # Try to load pre-trained model - NEW
+            model_loaded = predictor.load_model(symbol)
+
+            if not model_loaded:
+                print(f"No pre-trained model found for {symbol}. Training new model...")
+
+                # Get feature columns
+                feature_cols = feature_engineer.select_features()
+                feature_cols = [f for f in feature_cols if f in hist_data.columns]
+
+                print(f"Training with {len(feature_cols)} features...")
+
+                try:
+                    # Train model (only happens once per stock)
+                    predictor.train(hist_data, feature_cols, validation_split=0.2)
+                    predictor.save_model(symbol)
+                    print(f"✅ Model trained and saved for {symbol}")
+
+                except Exception as e:
+                    print(f"❌ Training failed for {symbol}: {e}")
+                    return None
+            else:
+                print(f"✅ Loaded pre-trained model for {symbol}")
+
+            # Generate predictions with trained model - NEW
+            feature_cols = predictor.feature_names
+            predictions = predictor.predict_multi_horizon(hist_data, feature_cols, current_price)
+
+            # Technical signals
+            signals = tech_analyzer.generate_signals(hist_data)
+
+            # Get fundamentals
+            import yfinance as yf
+            ticker = yf.Ticker(f"{symbol}.{exchange[:2]}")
+            info = ticker.info
+
+            return {
+                'symbol': symbol,
+                'name': info.get('longName', symbol),
+                'exchange': exchange,
+                'currentPrice': round(current_price, 2),
+                'change': round(((current_price - prev_price) / prev_price) * 100, 2),
+                'changePercent': f"{round(((current_price - prev_price) / prev_price) * 100, 2)}%",
+                'predictions': predictions,
+                'model_trained': True,  # NEW: indicates advanced model was used
+                'features_used': len(feature_cols),  # NEW: number of features
+                'technical': {
+                    'rsi': round(float(hist_data['RSI'].iloc[-1]), 2),
+                    'macd': round(float(hist_data['MACD'].iloc[-1]), 2),
+                    'ema20': round(float(hist_data['EMA_20'].iloc[-1]), 2),
+                    'signal': signals['overall']
+                },
+                'signals': signals['signals'],
+                'fundamentals': {
+                    'pe': info.get('trailingPE'),
+                    'eps': info.get('trailingEps'),
+                    'marketCap': info.get('marketCap')
+                }
+            }
+
+        except Exception as e:
+            print(f"Analysis error for {symbol}: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    @app.route('/api/analyze', methods=['POST'])
+    def analyze_stock():
+        data = request.json
+        symbol = data.get('symbol')
+        exchange = data.get('exchange', 'NSE')
+
+        result = get_cached_analysis(symbol, exchange)
+        if result:
+            return jsonify(result)
+
+        return jsonify({'error': 'Analysis failed'}), 500
+
+    # Create database tables
+    with app.app_context():
+        db.create_all()
+        print("Database tables created")
+
+    return app
+
+
+if __name__ == '__main__':
+    app = create_app(os.getenv('FLASK_ENV', 'development'))
+    print("=" * 60)
+    print("StockPulse Backend v3.0 - Advanced AI")
+    print("Features: Auth, Watchlist, Alerts, Portfolio, Advanced LSTM")
+    print("Server: http://localhost:5000")
+    print("=" * 60)
+    app.run(host='0.0.0.0', port=5000, debug=True)
