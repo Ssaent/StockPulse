@@ -14,40 +14,86 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      authAPI.getCurrentUser()
-        .then(res => setUser(res.data.user))
-        .catch(() => localStorage.removeItem('token'))
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    // Check for existing token and validate
+    checkAuth();
   }, []);
 
+  const checkAuth = async () => {
+    const token = localStorage.getItem('token');
+
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await authAPI.getCurrentUser();
+      setUser(response.data.user);
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      // Token is invalid, clear it
+      localStorage.removeItem('token');
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const login = async (email, password) => {
-    const response = await authAPI.login(email, password);
-    const { access_token, user } = response.data;
-    localStorage.setItem('token', access_token);
-    setUser(user);
-    return user;
+    try {
+      const response = await authAPI.login(email, password);
+      const { access_token, user } = response.data;
+
+      // Save token to localStorage
+      localStorage.setItem('token', access_token);
+
+      // Update user state
+      setUser(user);
+
+      return user;
+    } catch (error) {
+      console.error('Login failed:', error);
+      throw error;
+    }
   };
 
   const register = async (email, password) => {
-    const response = await authAPI.register(email, password);
-    const { access_token, user } = response.data;
-    localStorage.setItem('token', access_token);
-    setUser(user);
-    return user;
+    try {
+      const response = await authAPI.register(email, password);
+      const { access_token, user } = response.data;
+
+      // Save token to localStorage
+      localStorage.setItem('token', access_token);
+
+      // Update user state
+      setUser(user);
+
+      return user;
+    } catch (error) {
+      console.error('Registration failed:', error);
+      throw error;
+    }
   };
 
   const logout = () => {
+    // Clear token from localStorage
     localStorage.removeItem('token');
+
+    // Clear user state
     setUser(null);
   };
 
+  const value = {
+    user,
+    login,
+    register,
+    logout,
+    loading,
+    isAuthenticated: !!user
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading }}>
+    <AuthContext.Provider value={value}>
       {!loading && children}
     </AuthContext.Provider>
   );

@@ -3,6 +3,9 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_bcrypt import Bcrypt
 from config import config
+from services.news_fetcher import StockNewsFetcher
+from services.corporate_actions import CorporateActionsTracker
+import pandas as pd
 import os
 import sys
 
@@ -40,12 +43,14 @@ def create_app(config_name='development'):
     app.register_blueprint(alerts_bp, url_prefix='/api/alerts')
     app.register_blueprint(portfolio_bp, url_prefix='/api/portfolio')
 
-    # Initialize modules - UPDATED
+    # Initialize modules
     stock_fetcher = LiveStockFetcher()
     price_fetcher = RealTimePriceFetcher()
     tech_analyzer = TechnicalAnalyzer()
-    predictor = AdvancedStockPredictor()  # NEW: Advanced predictor
-    feature_engineer = FeatureEngineer()  # NEW: Feature engineer
+    predictor = AdvancedStockPredictor()
+    feature_engineer = FeatureEngineer()
+    news_fetcher = StockNewsFetcher()  # ADD THIS
+    actions_tracker = CorporateActionsTracker()  # ADD THIS
 
     @app.route('/api/health')
     def health():
@@ -76,7 +81,7 @@ def create_app(config_name='development'):
             if hist_data is None or hist_data.empty:
                 return None
 
-            # Feature engineering - NEW
+            # Feature engineering
             print(f"Creating features for {symbol}...")
             hist_data = feature_engineer.create_features(hist_data)
             hist_data = hist_data.dropna()
@@ -91,7 +96,7 @@ def create_app(config_name='development'):
             current_price = float(hist_data['Close'].iloc[-1])
             prev_price = float(hist_data['Close'].iloc[-2])
 
-            # Try to load pre-trained model - NEW
+            # Try to load pre-trained model
             model_loaded = predictor.load_model(symbol)
 
             if not model_loaded:
@@ -115,7 +120,7 @@ def create_app(config_name='development'):
             else:
                 print(f"✅ Loaded pre-trained model for {symbol}")
 
-            # Generate predictions with trained model - NEW
+            # Generate predictions with trained model
             feature_cols = predictor.feature_names
             predictions = predictor.predict_multi_horizon(hist_data, feature_cols, current_price)
 
@@ -135,8 +140,8 @@ def create_app(config_name='development'):
                 'change': round(((current_price - prev_price) / prev_price) * 100, 2),
                 'changePercent': f"{round(((current_price - prev_price) / prev_price) * 100, 2)}%",
                 'predictions': predictions,
-                'model_trained': True,  # NEW: indicates advanced model was used
-                'features_used': len(feature_cols),  # NEW: number of features
+                'model_trained': True,
+                'features_used': len(feature_cols),
                 'technical': {
                     'rsi': round(float(hist_data['RSI'].iloc[-1]), 2),
                     'macd': round(float(hist_data['MACD'].iloc[-1]), 2),
@@ -169,6 +174,70 @@ def create_app(config_name='development'):
 
         return jsonify({'error': 'Analysis failed'}), 500
 
+    # NEWS ROUTES - MOVED INSIDE create_app
+    @app.route('/api/news/stock/<symbol>', methods=['GET'])
+    def get_stock_news(symbol):
+        """Get news for specific stock"""
+        exchange = request.args.get('exchange', 'NSE')
+        limit = int(request.args.get('limit', 10))
+
+        try:
+            news = news_fetcher.get_stock_news(symbol, limit)
+
+            # Add relative time
+            for item in news:
+                item['relative_time'] = news_fetcher.get_relative_time(item['published_date'])
+                item['published_date'] = item['published_date'].isoformat()
+
+            return jsonify({
+                'symbol': symbol,
+                'news': news,
+                'total': len(news)
+            })
+        except Exception as e:
+            print(f"News fetch error: {e}")
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/news/market', methods=['GET'])
+    def get_market_news():
+        """Get general market news"""
+        limit = int(request.args.get('limit', 20))
+
+        try:
+            news = news_fetcher.get_market_news(limit)
+
+            for item in news:
+                item['relative_time'] = news_fetcher.get_relative_time(item['published_date'])
+                item['published_date'] = item['published_date'].isoformat()
+
+            return jsonify({
+                'news': news,
+                'total': len(news)
+            })
+        except Exception as e:
+            print(f"Market news fetch error: {e}")
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/corporate-actions/<symbol>', methods=['GET'])
+    def get_corporate_actions(symbol):
+        """Get corporate actions for stock"""
+        exchange = request.args.get('exchange', 'NSE')
+
+        try:
+            actions = actions_tracker.get_corporate_actions(symbol, exchange)
+
+            if not actions:
+                return jsonify({'error': 'No data available'}), 404
+
+            return jsonify({
+                'symbol': symbol,
+                'exchange': exchange,
+                'actions': actions
+            })
+        except Exception as e:
+            print(f"Corporate actions error: {e}")
+            return jsonify({'error': str(e)}), 500
+
     # Create database tables
     with app.app_context():
         db.create_all()
@@ -181,7 +250,7 @@ if __name__ == '__main__':
     app = create_app(os.getenv('FLASK_ENV', 'development'))
     print("=" * 60)
     print("StockPulse Backend v3.0 - Advanced AI")
-    print("Features: Auth, Watchlist, Alerts, Portfolio, Advanced LSTM")
+    print("Features: Auth, Watchlist, Alerts, Portfolio, Advanced LSTM, News, Corporate Actions")
     print("Server: http://localhost:5000")
     print("=" * 60)
     app.run(host='0.0.0.0', port=5000, debug=True)
