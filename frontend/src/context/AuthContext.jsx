@@ -12,11 +12,14 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    // Check for existing token and validate
-    checkAuth();
-  }, []);
+    if (!initialized) {
+      checkAuth();
+      setInitialized(true);
+    }
+  }, [initialized]);
 
   const checkAuth = async () => {
     const token = localStorage.getItem('token');
@@ -31,9 +34,11 @@ export const AuthProvider = ({ children }) => {
       setUser(response.data.user);
     } catch (error) {
       console.error('Auth check failed:', error);
-      // Token is invalid, clear it
-      localStorage.removeItem('token');
-      setUser(null);
+      // Only clear token if it's actually invalid (401)
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        setUser(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -44,10 +49,7 @@ export const AuthProvider = ({ children }) => {
       const response = await authAPI.login(email, password);
       const { access_token, user } = response.data;
 
-      // Save token to localStorage
       localStorage.setItem('token', access_token);
-
-      // Update user state
       setUser(user);
 
       return user;
@@ -62,10 +64,7 @@ export const AuthProvider = ({ children }) => {
       const response = await authAPI.register(email, password);
       const { access_token, user } = response.data;
 
-      // Save token to localStorage
       localStorage.setItem('token', access_token);
-
-      // Update user state
       setUser(user);
 
       return user;
@@ -76,10 +75,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    // Clear token from localStorage
     localStorage.removeItem('token');
-
-    // Clear user state
     setUser(null);
   };
 
@@ -92,9 +88,21 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated: !!user
   };
 
+  // Don't render children until auth check is complete
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };

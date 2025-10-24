@@ -1,27 +1,55 @@
-﻿from flask import Flask, jsonify, request
+﻿f"""
+ONLY REPLACE THE IMPORT SECTION (Lines 1-24) of your backend/app.py
+Keep everything else the same!
+"""
+
+from flask import Flask, jsonify, request
 from flask_cors import CORS
+from features.market import market_bp
 from flask_jwt_extended import JWTManager
 from flask_bcrypt import Bcrypt
-from config import config
-from services.news_fetcher import StockNewsFetcher
-from services.corporate_actions import CorporateActionsTracker
 import pandas as pd
 import os
 import sys
 
+
+# Fix path before imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from database.models import db
-from features.auth import auth_bp, jwt, bcrypt
-from features.watchlist import watchlist_bp
-from features.alerts import alerts_bp
-from features.portfolio import portfolio_bp
-from data_fetchers.live_stock_fetcher import LiveStockFetcher
-from data_fetchers.price_fetcher import RealTimePriceFetcher
-from ai_engine.technical_analyzer import TechnicalAnalyzer
-from ai_engine.advanced_lstm import AdvancedStockPredictor
-from ai_engine.feature_engineer import FeatureEngineer
-from utils.cache import cached
+# Try flexible imports (works from any execution context)
+try:
+    from backend.config import config
+    from backend.services.backtesting_service import BacktestingEngine
+    from backend.services.news_fetcher import StockNewsFetcher
+    from backend.services.corporate_actions import CorporateActionsTracker
+    from backend.database.models import db
+    from backend.features.auth import auth_bp, jwt, bcrypt
+    from backend.features.watchlist import watchlist_bp
+    from backend.features.alerts import alerts_bp
+    from backend.features.portfolio import portfolio_bp
+    from backend.data_fetchers.live_stock_fetcher import LiveStockFetcher
+    from backend.data_fetchers.price_fetcher import RealTimePriceFetcher
+    from backend.ai_engine.technical_analyzer import TechnicalAnalyzer
+    from backend.ai_engine.advanced_lstm import AdvancedStockPredictor
+    from backend.ai_engine.feature_engineer import FeatureEngineer
+    from backend.utils.cache import cached
+except ImportError:
+    # Fallback: running from backend directory
+    from config import config
+    from services.backtesting_service import BacktestingEngine
+    from services.news_fetcher import StockNewsFetcher
+    from services.corporate_actions import CorporateActionsTracker
+    from database.models import db
+    from features.auth import auth_bp, jwt, bcrypt
+    from features.watchlist import watchlist_bp
+    from features.alerts import alerts_bp
+    from features.portfolio import portfolio_bp
+    from data_fetchers.live_stock_fetcher import LiveStockFetcher
+    from data_fetchers.price_fetcher import RealTimePriceFetcher
+    from ai_engine.technical_analyzer import TechnicalAnalyzer
+    from ai_engine.advanced_lstm import AdvancedStockPredictor
+    from ai_engine.feature_engineer import FeatureEngineer
+    from utils.cache import cached
 
 
 def create_app(config_name='development'):
@@ -31,26 +59,36 @@ def create_app(config_name='development'):
     # JWT Secret Key
     app.config['JWT_SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 
-    # Initialize extensions
-    CORS(app)
+    # --- bind extensions to this app (minimal fix) ---
     db.init_app(app)
-    jwt.init_app(app)
     bcrypt.init_app(app)
+    jwt.init_app(app)
+
+    # CORS
+    CORS(
+        app,
+        supports_credentials=True,
+        origins=['http://localhost:5173', 'http://127.0.0.1:5173'],
+        allow_headers=['Content-Type', 'Authorization'],
+        expose_headers=['Authorization']
+    )
 
     # Register blueprints
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(watchlist_bp, url_prefix='/api/watchlist')
     app.register_blueprint(alerts_bp, url_prefix='/api/alerts')
     app.register_blueprint(portfolio_bp, url_prefix='/api/portfolio')
+    app.register_blueprint(market_bp, url_prefix='/api/market')
 
     # Initialize modules
     stock_fetcher = LiveStockFetcher()
     price_fetcher = RealTimePriceFetcher()
     tech_analyzer = TechnicalAnalyzer()
+    backtesting = BacktestingEngine()
     predictor = AdvancedStockPredictor()
     feature_engineer = FeatureEngineer()
-    news_fetcher = StockNewsFetcher()  # ADD THIS
-    actions_tracker = CorporateActionsTracker()  # ADD THIS
+    news_fetcher = StockNewsFetcher()
+    actions_tracker = CorporateActionsTracker()
 
     @app.route('/api/health')
     def health():
@@ -170,11 +208,23 @@ def create_app(config_name='development'):
 
         result = get_cached_analysis(symbol, exchange)
         if result:
+            # LOG PREDICTION FOR BACKTESTING
+            try:
+                backtesting.log_prediction(
+                    symbol=symbol,
+                    exchange=exchange,
+                    predictions=result['predictions'],
+                    current_price=result['currentPrice'],
+                    model_info={'features_used': result.get('features_used', 28)}
+                )
+            except Exception as e:
+                print(f"Failed to log prediction: {e}")
+
             return jsonify(result)
 
         return jsonify({'error': 'Analysis failed'}), 500
 
-    # NEWS ROUTES - MOVED INSIDE create_app
+    # NEWS ROUTES
     @app.route('/api/news/stock/<symbol>', methods=['GET'])
     def get_stock_news(symbol):
         """Get news for specific stock"""
@@ -218,6 +268,7 @@ def create_app(config_name='development'):
             print(f"Market news fetch error: {e}")
             return jsonify({'error': str(e)}), 500
 
+    # CORPORATE ACTIONS
     @app.route('/api/corporate-actions/<symbol>', methods=['GET'])
     def get_corporate_actions(symbol):
         """Get corporate actions for stock"""
@@ -236,6 +287,46 @@ def create_app(config_name='development'):
             })
         except Exception as e:
             print(f"Corporate actions error: {e}")
+            return jsonify({'error': str(e)}), 500
+
+    # BACKTESTING ROUTES
+    @app.route('/api/backtest/stats', methods=['GET'])
+    def get_backtest_stats():
+        """Get overall accuracy statistics"""
+        symbol = request.args.get('symbol')
+        timeframe = request.args.get('timeframe')
+        days = int(request.args.get('days', 30))
+
+        try:
+            stats = backtesting.get_accuracy_stats(symbol, timeframe, days)
+            return jsonify(stats)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/backtest/recent', methods=['GET'])
+    def get_recent_predictions():
+        """Get recent validated predictions"""
+        limit = int(request.args.get('limit', 20))
+
+        try:
+            predictions = backtesting.get_recent_predictions(limit)
+            return jsonify({
+                'predictions': predictions,
+                'total': len(predictions)
+            })
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/backtest/validate', methods=['POST'])
+    def validate_predictions_now():
+        """Manually trigger prediction validation"""
+        try:
+            count = backtesting.validate_predictions()
+            return jsonify({
+                'message': f'Validated {count} predictions',
+                'count': count
+            })
+        except Exception as e:
             return jsonify({'error': str(e)}), 500
 
     # Create database tables

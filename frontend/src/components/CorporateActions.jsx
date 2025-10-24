@@ -1,6 +1,216 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, TrendingUp, DollarSign, BarChart3, Clock, Gift, Award, Briefcase } from 'lucide-react';
+// frontend/src/components/CorporateActions.jsx
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Calendar,
+  TrendingUp,
+  DollarSign,
+  BarChart3,
+  Clock,
+  Gift,
+  Award,
+  Briefcase,
+} from 'lucide-react';
 import { corporateAPI } from '../services/api';
+
+/* ---------- RGV primitives (neon-noir, no rain) ---------- */
+
+function RgvPanel({ children, className = '' }) {
+  return (
+    <div
+      className={[
+        'relative overflow-hidden rounded-2xl p-6',
+        'border border-white/10',
+        'shadow-[0_24px_70px_rgba(0,0,0,0.6),inset_0_0_0_1px_rgba(255,255,255,0.05)]',
+        className,
+      ].join(' ')}
+      style={{
+        background:
+          'radial-gradient(140% 120% at 50% 70%, #0a0c0d 0%, #020303 55%, #000 100%)',
+      }}
+    >
+      {/* neon ghosts */}
+      <div className="pointer-events-none absolute inset-0 mix-blend-screen opacity-30">
+        <div
+          className="absolute -inset-1 blur-2xl"
+          style={{
+            background:
+              'radial-gradient(60% 60% at 65% 45%, rgba(225,29,72,0.38) 0%, transparent 70%)', // crimson
+          }}
+        />
+        <div
+          className="absolute -inset-1 blur-2xl"
+          style={{
+            background:
+              'radial-gradient(60% 60% at 35% 70%, rgba(34,197,94,0.28) 0%, transparent 70%)', // toxic green
+          }}
+        />
+      </div>
+
+      {/* scanlines */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-20 mix-blend-overlay"
+        style={{
+          backgroundImage:
+            'repeating-linear-gradient(to bottom, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 1px, transparent 2px, transparent 3px)',
+        }}
+      />
+
+      {/* grain */}
+      <div className="pointer-events-none absolute inset-0 opacity-50 mix-blend-soft-light rgv-grain" />
+
+      {/* vignette */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(circle at 50% 60%, rgba(0,0,0,0) 45%, rgba(0,0,0,0.85) 100%)',
+        }}
+      />
+
+      <div className="relative z-10">{children}</div>
+
+      <style>{`
+        .rgv-grain {
+          background-image: url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'>\
+<filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/></filter>\
+<rect width='100%' height='100%' filter='url(%23n)' opacity='0.06'/></svg>");
+          background-size: 180px 180px;
+          animation: rgvGrain 9s linear infinite;
+        }
+        @keyframes rgvGrain { 0% { transform: translate(0,0) } 100% { transform: translate(-80px,-60px) } }
+        @keyframes rgvShimmer { 0% { transform: translateX(-120%);} 100% { transform: translateX(120%);} }
+        .animate-rgv-shimmer { animation: rgvShimmer 3.6s ease-in-out infinite; }
+      `}</style>
+    </div>
+  );
+}
+
+function Kpi({ icon: Icon, value, label, color }) {
+  const map = {
+    yellow: {
+      text: 'text-yellow-300',
+      border: 'border-yellow-500/30',
+      bg: 'bg-yellow-500/10',
+      tile: 'bg-yellow-500/15 border-yellow-500/30',
+      glow: '0 10px 28px rgba(250,204,21,0.22)',
+    },
+    green: {
+      text: 'text-green-300',
+      border: 'border-green-500/30',
+      bg: 'bg-green-500/10',
+      tile: 'bg-green-500/15 border-green-500/30',
+      glow: '0 10px 28px rgba(34,197,94,0.22)',
+    },
+    blue: {
+      text: 'text-blue-300',
+      border: 'border-blue-500/30',
+      bg: 'bg-blue-500/10',
+      tile: 'bg-blue-500/15 border-blue-500/30',
+      glow: '0 10px 28px rgba(59,130,246,0.22)',
+    },
+  }[color];
+
+  return (
+    <div className={`rounded-xl p-4 border ${map.border} ${map.bg} shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]`}>
+      <div className="flex items-center gap-3">
+        <div
+          className={`w-10 h-10 rounded-lg border ${map.tile} flex items-center justify-center`}
+          style={{ boxShadow: map.glow }}
+        >
+          <Icon className={`w-5 h-5 ${map.text}`} />
+        </div>
+        <div>
+          <div className={`text-2xl font-extrabold ${map.text}`}>{value}</div>
+          <div className="text-[11px] tracking-wide uppercase text-gray-400">{label}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Tab({ active, onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      className={[
+        'px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all',
+        active
+          ? 'bg-white/10 text-white border border-white/20 shadow-[0_10px_30px_rgba(255,255,255,0.06)]'
+          : 'bg-white/[0.04] hover:bg-white/10 text-gray-300 border border-white/10',
+      ].join(' ')}
+    >
+      {children}
+    </button>
+  );
+}
+
+function TypePill({ type, status }) {
+  const colors = getActionColor(type, status);
+  return (
+    <span
+      className={[
+        'text-xs px-2 py-1 rounded-md border',
+        colors.bg,
+        colors.text,
+        colors.border,
+        'shadow-[0_0_0_1px_rgba(255,255,255,0.05)]',
+      ].join(' ')}
+    >
+      {status || type}
+    </span>
+  );
+}
+
+/* ---------- Visual helpers ---------- */
+
+function getActionIcon(type) {
+  const t = type?.toLowerCase() || '';
+  if (t.includes('dividend')) return <Gift className="w-5 h-5" />;
+  if (t.includes('split')) return <BarChart3 className="w-5 h-5" />;
+  if (t.includes('earning')) return <Award className="w-5 h-5" />;
+  return <Calendar className="w-5 h-5" />;
+}
+
+function getActionColor(type, status) {
+  const t = (type || '').toLowerCase();
+  if (status === 'Upcoming')
+    return {
+      border: 'border-yellow-500/30',
+      bg: 'bg-yellow-500/10',
+      text: 'text-yellow-300',
+      iconBg: 'bg-yellow-500/20',
+    };
+  if (t.includes('dividend'))
+    return {
+      border: 'border-green-500/30',
+      bg: 'bg-green-500/10',
+      text: 'text-green-300',
+      iconBg: 'bg-green-500/20',
+    };
+  if (t.includes('split'))
+    return {
+      border: 'border-blue-500/30',
+      bg: 'bg-blue-500/10',
+      text: 'text-blue-300',
+      iconBg: 'bg-blue-500/20',
+    };
+  if (t.includes('earning'))
+    return {
+      border: 'border-fuchsia-500/30',
+      bg: 'bg-fuchsia-500/10',
+      text: 'text-fuchsia-300',
+      iconBg: 'bg-fuchsia-500/20',
+    };
+  return {
+    border: 'border-gray-500/30',
+    bg: 'bg-gray-500/10',
+    text: 'text-gray-300',
+    iconBg: 'bg-gray-500/20',
+  };
+}
+
+/* ---------- Main Component (RGV-styled) ---------- */
 
 export default function CorporateActions({ symbol, exchange = 'NSE' }) {
   const [actions, setActions] = useState(null);
@@ -9,339 +219,204 @@ export default function CorporateActions({ symbol, exchange = 'NSE' }) {
   const [activeTab, setActiveTab] = useState('all');
 
   useEffect(() => {
-    loadActions();
-  }, [symbol]);
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await corporateAPI.getActions(symbol, exchange);
+        if (!mounted) return;
+        setActions(res.data.actions);
+      } catch (err) {
+        console.error('Error loading corporate actions:', err);
+        if (mounted) setError('Failed to load corporate actions');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [symbol, exchange]);
 
-  const loadActions = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await corporateAPI.getActions(symbol, exchange);
-      setActions(response.data.actions);
-    } catch (err) {
-      console.error('Error loading corporate actions:', err);
-      setError('Failed to load corporate actions');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getActionIcon = (type) => {
-    if (type.includes('Dividend')) return <Gift className="w-5 h-5" />;
-    if (type.includes('Split')) return <BarChart3 className="w-5 h-5" />;
-    if (type.includes('Earnings')) return <Award className="w-5 h-5" />;
-    return <Calendar className="w-5 h-5" />;
-  };
-
-  const getActionColor = (type, status) => {
-    if (status === 'Upcoming') return {
-      border: 'border-yellow-500/30',
-      bg: 'bg-yellow-500/10',
-      text: 'text-yellow-400',
-      iconBg: 'bg-yellow-500/20'
-    };
-    if (type.includes('Dividend')) return {
-      border: 'border-green-500/30',
-      bg: 'bg-green-500/10',
-      text: 'text-green-400',
-      iconBg: 'bg-green-500/20'
-    };
-    if (type.includes('Split')) return {
-      border: 'border-blue-500/30',
-      bg: 'bg-blue-500/10',
-      text: 'text-blue-400',
-      iconBg: 'bg-blue-500/20'
-    };
-    if (type.includes('Earnings')) return {
-      border: 'border-purple-500/30',
-      bg: 'bg-purple-500/10',
-      text: 'text-purple-400',
-      iconBg: 'bg-purple-500/20'
-    };
-    return {
-      border: 'border-gray-500/30',
-      bg: 'bg-gray-500/10',
-      text: 'text-gray-400',
-      iconBg: 'bg-gray-500/20'
-    };
-  };
-
-  if (loading) {
-    return (
-      <div className="card">
-        <div className="flex items-center gap-2 mb-4">
-          <Briefcase className="w-5 h-5 text-purple-400" />
-          <h4 className="text-xl font-bold">Corporate Actions</h4>
-        </div>
-        <div className="grid md:grid-cols-2 gap-3">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="glass p-4 rounded-lg animate-pulse">
-              <div className="h-4 bg-white/10 rounded w-2/3 mb-2"></div>
-              <div className="h-3 bg-white/10 rounded w-1/2"></div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="card">
-        <div className="flex items-center gap-2 mb-4">
-          <Briefcase className="w-5 h-5 text-purple-400" />
-          <h4 className="text-xl font-bold">Corporate Actions</h4>
-        </div>
-        <div className="text-center py-8 text-gray-400">
-          <p>{error}</p>
-        </div>
-      </div>
-    );
-  }
-
-  const allActions = [
-    ...(actions?.dividends || []),
-    ...(actions?.splits || []),
-    ...(actions?.earnings || []),
-    ...(actions?.upcoming_events || [])
-  ];
+  const allActions = useMemo(
+    () => [
+      ...(actions?.dividends || []),
+      ...(actions?.splits || []),
+      ...(actions?.earnings || []),
+      ...(actions?.upcoming_events || []),
+    ],
+    [actions]
+  );
 
   const upcomingCount = actions?.upcoming_events?.length || 0;
   const dividendCount = actions?.dividends?.length || 0;
   const splitCount = actions?.splits?.length || 0;
 
-  return (
-    <div className="card">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2">
-          <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-            <Briefcase className="w-5 h-5 text-purple-400" />
+  /* ---------- Loading / Error ---------- */
+
+  if (loading) {
+    return (
+      <RgvPanel>
+        <div className="flex items-center gap-3 mb-6">
+          <div
+            className="w-12 h-12 rounded-xl border flex items-center justify-center"
+            style={{
+              background: 'linear-gradient(135deg, rgba(236,72,153,0.18), rgba(255,255,255,0.04))',
+              borderColor: 'rgba(236,72,153,0.35)',
+              boxShadow: '0 10px 28px rgba(236,72,153,0.22)',
+            }}
+          >
+            <Briefcase className="w-6 h-6 text-pink-300" />
           </div>
           <div>
             <h4 className="text-xl font-bold">Corporate Actions</h4>
-            <p className="text-sm text-gray-400">{allActions.length} total events</p>
+            <p className="text-xs text-gray-400">Fetching latest events…</p>
           </div>
+        </div>
+        <div className="grid md:grid-cols-2 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-xl p-4 border border-white/10 bg-white/5 animate-pulse shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+            >
+              <div className="h-4 bg-white/10 rounded w-2/3 mb-3" />
+              <div className="h-3 bg-white/10 rounded w-1/2" />
+            </div>
+          ))}
+        </div>
+      </RgvPanel>
+    );
+  }
+
+  if (error) {
+    return (
+      <RgvPanel>
+        <div className="flex items-center gap-3 mb-6">
+          <div
+            className="w-12 h-12 rounded-xl border flex items-center justify-center"
+            style={{
+              background: 'linear-gradient(135deg, rgba(236,72,153,0.18), rgba(255,255,255,0.04))',
+              borderColor: 'rgba(236,72,153,0.35)',
+              boxShadow: '0 10px 28px rgba(236,72,153,0.22)',
+            }}
+          >
+            <Briefcase className="w-6 h-6 text-pink-300" />
+          </div>
+          <div>
+            <h4 className="text-xl font-bold">Corporate Actions</h4>
+            <p className="text-xs text-gray-400">We’ll try again shortly</p>
+          </div>
+        </div>
+        <div className="text-center py-10 text-gray-400">{error}</div>
+      </RgvPanel>
+    );
+  }
+
+  /* ---------- Content ---------- */
+
+  return (
+    <RgvPanel>
+      {/* header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-12 h-12 rounded-xl border flex items-center justify-center"
+            style={{
+              background: 'linear-gradient(135deg, rgba(236,72,153,0.18), rgba(255,255,255,0.04))',
+              borderColor: 'rgba(236,72,153,0.35)',
+              boxShadow: '0 10px 28px rgba(236,72,153,0.22)',
+            }}
+          >
+            <Briefcase className="w-6 h-6 text-pink-300" />
+          </div>
+          <div>
+            <h4 className="text-xl font-bold tracking-tight">Corporate Actions</h4>
+            <p className="text-xs text-gray-400">{allActions.length} total events</p>
+          </div>
+        </div>
+        <div className="text-sm text-gray-400">
+          <span className="opacity-70">Symbol:</span>{' '}
+          <span className="font-semibold">{symbol}</span>
         </div>
       </div>
 
-      {/* Quick Stats */}
+      {/* KPIs */}
       <div className="grid grid-cols-3 gap-3 mb-6">
-        <div className="glass p-3 rounded-lg text-center">
-          <Clock className="w-5 h-5 text-yellow-400 mx-auto mb-1" />
-          <div className="text-2xl font-bold text-yellow-400">{upcomingCount}</div>
-          <div className="text-xs text-gray-400">Upcoming</div>
-        </div>
-        <div className="glass p-3 rounded-lg text-center">
-          <Gift className="w-5 h-5 text-green-400 mx-auto mb-1" />
-          <div className="text-2xl font-bold text-green-400">{dividendCount}</div>
-          <div className="text-xs text-gray-400">Dividends</div>
-        </div>
-        <div className="glass p-3 rounded-lg text-center">
-          <BarChart3 className="w-5 h-5 text-blue-400 mx-auto mb-1" />
-          <div className="text-2xl font-bold text-blue-400">{splitCount}</div>
-          <div className="text-xs text-gray-400">Splits</div>
-        </div>
+        <Kpi icon={Clock} value={upcomingCount} label="Upcoming" color="yellow" />
+        <Kpi icon={Gift} value={dividendCount} label="Dividends" color="green" />
+        <Kpi icon={BarChart3} value={splitCount} label="Splits" color="blue" />
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-4 overflow-x-auto">
-        {['all', 'upcoming', 'dividends', 'splits', 'earnings'].map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
-              activeTab === tab
-                ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
-                : 'glass hover:bg-white/10'
-            }`}
-          >
+      <div className="flex gap-2 mb-5 overflow-x-auto no-scrollbar">
+        {['all', 'upcoming', 'dividends', 'splits', 'earnings'].map((tab) => (
+          <Tab key={tab} active={activeTab === tab} onClick={() => setActiveTab(tab)}>
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </button>
+          </Tab>
         ))}
       </div>
 
-      {/* Timeline View */}
-      <div className="space-y-3 max-h-96 overflow-y-auto">
-        {/* Upcoming Events */}
+      {/* Timeline */}
+      <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
         {(activeTab === 'all' || activeTab === 'upcoming') && actions?.upcoming_events?.length > 0 && (
-          <div>
-            {activeTab === 'all' && (
-              <h5 className="text-sm font-semibold text-yellow-400 mb-2 flex items-center gap-2">
-                <Clock className="w-4 h-4" />
-                Upcoming Events
-              </h5>
-            )}
-            {actions.upcoming_events.map((event, index) => {
-              const colors = getActionColor(event.type, event.status);
-              return (
-                <div
-                  key={index}
-                  className={`p-4 rounded-lg border ${colors.border} ${colors.bg} mb-2 hover:scale-[1.02] transition-transform`}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg ${colors.iconBg} flex-shrink-0`}>
-                      <div className={colors.text}>
-                        {getActionIcon(event.type)}
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <h6 className="font-bold">{event.type}</h6>
-                        <span className={`text-xs px-2 py-1 rounded ${colors.bg} ${colors.text} border ${colors.border}`}>
-                          {event.status}
-                        </span>
-                      </div>
-                      {event.amount && (
-                        <div className="text-2xl font-bold text-green-400 mb-1">
-                          ₹{event.amount.toFixed(2)}
-                        </div>
-                      )}
-                      <div className="flex items-center gap-4 text-sm text-gray-400">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4" />
-                          {new Date(event.date).toLocaleDateString('en-IN', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric'
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <Section title="Upcoming Events" icon={<Clock className="w-4 h-4" />} accent="text-yellow-300">
+            {actions.upcoming_events.map((event, i) => (
+              <TimelineItem
+                key={`up-${i}`}
+                type={event.type}
+                status={event.status}
+                amount={event.amount}
+                ratio={event.ratio}
+                date={event.date}
+              />
+            ))}
+          </Section>
         )}
 
-        {/* Dividends */}
         {(activeTab === 'all' || activeTab === 'dividends') && actions?.dividends?.length > 0 && (
-          <div>
-            {activeTab === 'all' && (
-              <h5 className="text-sm font-semibold text-green-400 mb-2 flex items-center gap-2">
-                <Gift className="w-4 h-4" />
-                Dividend History
-              </h5>
-            )}
-            {actions.dividends.map((dividend, index) => {
-              const colors = getActionColor(dividend.type, dividend.status);
-              return (
-                <div
-                  key={index}
-                  className={`p-4 rounded-lg border ${colors.border} ${colors.bg} mb-2 hover:scale-[1.02] transition-transform`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-lg ${colors.iconBg} flex-shrink-0`}>
-                      <Gift className={`w-5 h-5 ${colors.text}`} />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="text-2xl font-bold text-green-400">
-                            ₹{dividend.amount.toFixed(2)}
-                          </div>
-                          <div className="text-sm text-gray-400">{dividend.relative_time}</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm font-medium text-gray-300">
-                            {new Date(dividend.date).toLocaleDateString('en-IN', {
-                              month: 'short',
-                              year: 'numeric'
-                            })}
-                          </div>
-                          <div className={`text-xs ${colors.text}`}>{dividend.status}</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <Section title="Dividend History" icon={<Gift className="w-4 h-4" />} accent="text-green-300">
+            {actions.dividends.map((d, i) => (
+              <TimelineItem
+                key={`div-${i}`}
+                type={d.type || 'Dividend'}
+                status={d.status}
+                amount={d.amount}
+                date={d.date}
+                rightTop={`${new Date(d.date).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}`}
+                rightBottom={d.relative_time}
+              />
+            ))}
+          </Section>
         )}
 
-        {/* Stock Splits */}
         {(activeTab === 'all' || activeTab === 'splits') && actions?.splits?.length > 0 && (
-          <div>
-            {activeTab === 'all' && (
-              <h5 className="text-sm font-semibold text-blue-400 mb-2 flex items-center gap-2">
-                <BarChart3 className="w-4 h-4" />
-                Stock Split History
-              </h5>
-            )}
-            {actions.splits.map((split, index) => {
-              const colors = getActionColor(split.type, split.status);
-              return (
-                <div
-                  key={index}
-                  className={`p-4 rounded-lg border ${colors.border} ${colors.bg} mb-2 hover:scale-[1.02] transition-transform`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-lg ${colors.iconBg} flex-shrink-0`}>
-                      <BarChart3 className={`w-5 h-5 ${colors.text}`} />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="text-xl font-bold text-blue-400">{split.ratio}</div>
-                          <div className="text-sm text-gray-400">{split.relative_time}</div>
-                        </div>
-                        <div className="text-sm text-gray-300">
-                          {new Date(split.date).toLocaleDateString('en-IN', {
-                            month: 'short',
-                            year: 'numeric'
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <Section title="Stock Split History" icon={<BarChart3 className="w-4 h-4" />} accent="text-blue-300">
+            {actions.splits.map((s, i) => (
+              <TimelineItem
+                key={`spl-${i}`}
+                type={s.type || 'Split'}
+                status={s.status}
+                ratio={s.ratio}
+                date={s.date}
+                rightTop={`${new Date(s.date).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}`}
+                rightBottom={s.relative_time}
+              />
+            ))}
+          </Section>
         )}
 
-        {/* Earnings */}
         {(activeTab === 'all' || activeTab === 'earnings') && actions?.earnings?.length > 0 && (
-          <div>
-            {activeTab === 'all' && (
-              <h5 className="text-sm font-semibold text-purple-400 mb-2 flex items-center gap-2">
-                <Award className="w-4 h-4" />
-                Earnings Calendar
-              </h5>
-            )}
-            {actions.earnings.map((earning, index) => {
-              const colors = getActionColor(earning.type, earning.status);
-              return (
-                <div
-                  key={index}
-                  className={`p-4 rounded-lg border ${colors.border} ${colors.bg} mb-2 hover:scale-[1.02] transition-transform`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-lg ${colors.iconBg} flex-shrink-0`}>
-                      <Award className={`w-5 h-5 ${colors.text}`} />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-bold text-purple-400">{earning.quarter}</div>
-                          <div className="text-xs text-gray-400">{earning.status}</div>
-                        </div>
-                        <div className="text-sm text-gray-300">
-                          {new Date(earning.date).toLocaleDateString('en-IN', {
-                            month: 'short',
-                            day: 'numeric'
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <Section title="Earnings Calendar" icon={<Award className="w-4 h-4" />} accent="text-fuchsia-300">
+            {actions.earnings.map((e, i) => (
+              <TimelineItem
+                key={`ear-${i}`}
+                type={e.type || 'Earnings'}
+                status={e.status}
+                date={e.date}
+                leftTop={e.quarter}
+                rightTop={`${new Date(e.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}`}
+              />
+            ))}
+          </Section>
         )}
 
         {allActions.length === 0 && (
@@ -350,6 +425,84 @@ export default function CorporateActions({ symbol, exchange = 'NSE' }) {
             <p className="text-gray-400">No corporate actions available for {symbol}</p>
           </div>
         )}
+      </div>
+    </RgvPanel>
+  );
+}
+
+/* ---------- Section & Timeline ---------- */
+
+function Section({ title, icon, accent, children }) {
+  return (
+    <div className="mb-2">
+      <div className={`text-sm font-semibold ${accent} mb-2 flex items-center gap-2`}>
+        {icon}
+        {title}
+      </div>
+      <div className="space-y-2">{children}</div>
+    </div>
+  );
+}
+
+function TimelineItem({ type, status, amount, ratio, date, leftTop, rightTop, rightBottom }) {
+  const colors = getActionColor(type, status);
+  const icon = getActionIcon(type);
+
+  return (
+    <div
+      className={[
+        'relative p-4 rounded-xl border transition-transform',
+        colors.border,
+        colors.bg,
+        'hover:scale-[1.01] shadow-[0_16px_44px_rgba(0,0,0,0.38),inset_0_1px_0_rgba(255,255,255,0.06)]',
+      ].join(' ')}
+    >
+      {/* neon orb */}
+      <div
+        className="pointer-events-none absolute -top-10 -right-10 w-40 h-40 rounded-full blur-2xl opacity-20"
+        style={{ background: 'radial-gradient(circle, rgba(225,29,72,0.28) 0%, transparent 70%)' }}
+      />
+      <div className="flex items-start gap-4">
+        <div className={`p-3 rounded-lg ${colors.iconBg} flex-shrink-0 border border-white/10`}>
+          <div className={colors.text}>{icon}</div>
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h6 className="font-bold">{type}</h6>
+                <TypePill type={type} status={status} />
+              </div>
+
+              {(amount || ratio || leftTop) && (
+                <div className="mt-1 flex items-center gap-3 text-sm text-gray-300 flex-wrap">
+                  {leftTop && <span className="font-medium text-fuchsia-300">{leftTop}</span>}
+                  {typeof amount === 'number' && (
+                    <span className="font-semibold text-green-300">₹{amount.toFixed(2)}</span>
+                  )}
+                  {ratio && <span className="font-semibold text-blue-300">{ratio}</span>}
+                </div>
+              )}
+
+              {date && (
+                <div className="mt-1 text-sm text-gray-400 flex items-center gap-1">
+                  <Calendar className="w-4 h-4" />
+                  {new Date(date).toLocaleDateString('en-IN', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="text-right shrink-0">
+              {rightTop && <div className="text-sm text-gray-300">{rightTop}</div>}
+              {rightBottom && <div className="text-xs text-gray-400">{rightBottom}</div>}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

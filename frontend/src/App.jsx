@@ -1,29 +1,38 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+
 import Landing from './pages/Landing';
 import Login from './pages/Login';
+import Alerts from './pages/Alerts';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Watchlist from './pages/Watchlist';
 import Portfolio from './pages/Portfolio';
+import Backtesting from './pages/Backtesting';
 import MarketNews from './pages/MarketNews';
 
-// Protected Route Component
+// Protected route wrapper
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
 
-  // Show loading spinner while checking auth
+  // Still loading auth state
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950">
         <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full"></div>
       </div>
     );
   }
 
-  // Redirect to login if not authenticated
-  return user ? children : <Navigate to="/login" replace />;
+  // Not authenticated - redirect to login
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Authenticated - render children
+  return children;
 }
 
 function App() {
@@ -34,6 +43,7 @@ function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+
           <Route
             path="/dashboard"
             element={
@@ -42,6 +52,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/watchlist"
             element={
@@ -50,6 +61,17 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          <Route
+            path="/backtesting"
+            element={
+              <ProtectedRoute>
+                <Backtesting />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/alerts" element={<Alerts />} />
+
           <Route
             path="/portfolio"
             element={
@@ -58,14 +80,15 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
-  path="/news"
-  element={
-    <ProtectedRoute>
-      <MarketNews />
-    </ProtectedRoute>
-  }
-/>
+            path="/news"
+            element={
+              <ProtectedRoute>
+                <MarketNews />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </Router>
     </AuthProvider>

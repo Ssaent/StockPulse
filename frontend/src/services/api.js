@@ -7,6 +7,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: false, // Important for CORS
 });
 
 // Request interceptor - Add token to every request
@@ -23,14 +24,18 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor - Handle token expiration
+// Response interceptor - Handle errors but DON'T auto-logout on every error
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid
+    // Only logout on 401 (Unauthorized) for auth endpoints
+    if (error.response?.status === 401 && error.config.url.includes('/auth/me')) {
+      console.log('Token expired, clearing auth');
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      // Only redirect if not already on login page
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
@@ -76,6 +81,19 @@ export const newsAPI = {
 export const corporateAPI = {
   getActions: (symbol, exchange = 'NSE') =>
     api.get(`/corporate-actions/${symbol}?exchange=${exchange}`),
+};
+
+export const backtestAPI = {
+  getStats: (timeframe, days = 30) => {
+    const params = new URLSearchParams();
+    if (timeframe && timeframe !== 'all') params.append('timeframe', timeframe);
+    params.append('days', days);
+    return api.get(`/backtest/stats?${params.toString()}`);
+  },
+  getRecentPredictions: (limit = 20) =>
+    api.get(`/backtest/recent?limit=${limit}`),
+  validateNow: () =>
+    api.post('/backtest/validate'),
 };
 
 export default api;

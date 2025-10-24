@@ -9,7 +9,6 @@ auth_bp = Blueprint('auth', __name__)
 bcrypt = Bcrypt()
 jwt = JWTManager()
 
-
 @auth_bp.route('/register', methods=['POST'])
 def register():
     """Register new user"""
@@ -41,7 +40,6 @@ def register():
         'access_token': access_token
     }), 201
 
-
 @auth_bp.route('/login', methods=['POST'])
 def login():
     """Login user"""
@@ -65,27 +63,20 @@ def login():
     # Generate token
     access_token = create_access_token(identity=str(user.id), expires_delta=timedelta(days=7))
 
-
     return jsonify({
         'message': 'Login successful',
         'user': user.to_dict(),
         'access_token': access_token
     })
 
-
 @auth_bp.route('/me', methods=['GET'])
 @jwt_required()
 def get_current_user():
     """Get current user info"""
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
 
-    @auth_bp.route('/me', methods=['GET'])
-    @jwt_required()
-    def get_current_user():
-        """Get current user info"""
-        user_id = int(get_jwt_identity())  # Convert string back to int
-        user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
 
-        if not user:
-            return jsonify({'error': 'User not found'}), 404
-
-        return jsonify({'user': user.to_dict()})
+    return jsonify({'user': user.to_dict()})

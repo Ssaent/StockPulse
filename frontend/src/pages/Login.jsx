@@ -1,112 +1,183 @@
+// frontend/src/pages/Login.jsx
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { TrendingUp, Mail, Lock, AlertCircle } from 'lucide-react';
+import NamasteWelcome from '../components/NamasteWelcome';
+
+function formatRGVError(err) {
+  // Network or unknown fetch/axios style errors
+  const status = err?.response?.status;
+  const apiMsg = err?.response?.data?.error || err?.message || '';
+
+  if (status === 400) return "Bad request. Clean it up and try again.";
+  if (status === 401) return "Credentials don’t check out. Try again—carefully.";
+  if (status === 403) return "Access denied. You don’t have the keys to this door.";
+  if (status === 404) return "Endpoint not found. Someone moved the street sign.";
+  if (status === 409) return "Conflict. This account is already in play.";
+  if (status === 422) return "Invalid payload. Keep it simple, keep it correct.";
+  if (status === 429) return "Too many attempts. Step back for a minute.";
+  if (status >= 500) return "Server’s having a bad day. It’s on us, not you.";
+
+  // No status? Likely network/cors
+  if (!status && apiMsg.toLowerCase().includes('network')) {
+    return "No signal. Check your connection and try again.";
+  }
+
+  // Fallbacks
+  if (apiMsg) return apiMsg;
+  return "Login failed. Keep it sharp and try again.";
+}
+
+function validate(email, password) {
+  if (!email || !password) return "Email and password—both. No excuses.";
+  // light email check
+  const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  if (!ok) return "That email doesn’t look real. Fix it.";
+  if (password.length < 6) return "Password’s too short. Make it count (6+).";
+  return null;
+}
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [userName, setUserName] = useState('');
+
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
+    setErrorMsg('');
 
+    const v = validate(email, password);
+    if (v) { setErrorMsg(v); return; }
+
+    setLoading(true);
     try {
-      await login(email, password);
-      navigate('/dashboard');
+      const userData = await login(email, password);
+      const name = userData?.name || userData?.email?.split('@')?.[0] || 'Friend';
+      setUserName(name);
+      // RGV move: we don’t waste a beat—straight to welcome
+      setShowWelcome(true);
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed. Please try again.');
-    } finally {
+      setErrorMsg(formatRGVError(err));
       setLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center px-6">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-              <TrendingUp className="w-7 h-7" />
-            </div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-              StockPulse
-            </h1>
-          </div>
-          <p className="text-gray-400">Sign in to your account</p>
-        </div>
+  const handleWelcomeComplete = () => {
+    navigate('/dashboard', { replace: true });
+  };
 
-        {/* Login Form */}
-        <div className="card">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 text-red-400">
-                <AlertCircle className="w-5 h-5" />
-                <span className="text-sm">{error}</span>
+  return (
+    <div className="relative min-h-screen">
+      {/* Post-login welcome overlay */}
+      {showWelcome && (
+        <div className="fixed inset-0 z-50">
+          <NamasteWelcome userName={userName} onComplete={handleWelcomeComplete} />
+        </div>
+      )}
+
+      {/* Background: RGV neon-noir, no rain */}
+      <div
+        className="min-h-screen flex items-center justify-center px-4"
+        style={{
+          background:
+            'radial-gradient(120% 100% at 70% 10%, #0e1220 0%, #05070c 50%, #000 100%)',
+        }}
+      >
+        <div className="w-full max-w-md relative overflow-hidden rounded-2xl border border-white/10 shadow-[0_30px_80px_rgba(0,0,0,0.6),inset_0_0_0_1px_rgba(255,255,255,0.06)]">
+          {/* neon ghosts */}
+          <div
+            className="pointer-events-none absolute -top-24 -right-24 w-64 h-64 rounded-full blur-3xl opacity-30"
+            style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.35) 0%, transparent 70%)' }}
+          />
+          <div
+            className="pointer-events-none absolute -bottom-24 -left-24 w-64 h-64 rounded-full blur-3xl opacity-25"
+            style={{ background: 'radial-gradient(circle, rgba(168,85,247,0.30) 0%, transparent 70%)' }}
+          />
+          {/* scanlines */}
+          <div
+            className="pointer-events-none absolute inset-0 opacity-10 mix-blend-overlay"
+            style={{
+              backgroundImage:
+                'repeating-linear-gradient(to bottom, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 1px, transparent 2px, transparent 3px)',
+            }}
+          />
+
+          <div className="relative z-10 p-8 bg-black/30 backdrop-blur">
+            {/* Header */}
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">Welcome Back</h1>
+              <p className="text-gray-400">Log in to <span className="text-white/90 font-semibold">StockPulse</span></p>
+            </div>
+
+            {/* Error bar (RGV tone) */}
+            {errorMsg && (
+              <div className="mb-5 rounded-lg border border-red-500/30 bg-red-500/10 text-red-300 px-4 py-3 text-sm shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
+                {errorMsg}
               </div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium mb-2">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Email</label>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="input pl-10"
                   placeholder="you@example.com"
                   required
+                  disabled={loading}
+                  className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-transparent"
                 />
               </div>
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-2">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Password</label>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="input pl-10"
                   placeholder="••••••••"
                   required
+                  disabled={loading}
+                  className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/60 focus:border-transparent"
                 />
               </div>
-            </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Signing in...' : 'Sign In'}
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={loading}
+                className={[
+                  'w-full py-3 px-4 rounded-lg font-semibold text-white transition-all',
+                  loading
+                    ? 'bg-white/10 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 hover:scale-[1.01]',
+                ].join(' ')}
+              >
+                {loading ? 'Logging in…' : 'Login'}
+              </button>
 
-          <div className="mt-6 text-center">
-            <p className="text-gray-400">
-              Don't have an account?{' '}
-              <Link to="/register" className="text-blue-400 hover:text-blue-300 font-semibold">
-                Sign up
-              </Link>
-            </p>
+              <div className="text-center text-sm text-gray-400">
+                Don’t have an account?{' '}
+                <Link to="/register" className="text-blue-300 hover:text-blue-200 font-medium">
+                  Sign up
+                </Link>
+              </div>
+            </form>
           </div>
         </div>
-
-        <div className="mt-6 text-center">
-          <Link to="/" className="text-gray-400 hover:text-white text-sm">
-            ← Back to home
-          </Link>
-        </div>
       </div>
+
+      {/* Local styles only */}
+      <style>{`
+        /* Keep animations subtle; RGV doesn't do fireworks here */
+      `}</style>
     </div>
   );
 }

@@ -1,4 +1,7 @@
-"""Database models for user data"""
+"""
+Database models for StockPulse
+Complete and updated version with all tables
+"""
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 
@@ -6,6 +9,7 @@ db = SQLAlchemy()
 
 
 class User(db.Model):
+    """User accounts"""
     __tablename__ = 'users'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -29,6 +33,7 @@ class User(db.Model):
 
 
 class Watchlist(db.Model):
+    """User watchlists"""
     __tablename__ = 'watchlist'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -49,6 +54,7 @@ class Watchlist(db.Model):
 
 
 class Alert(db.Model):
+    """Price and technical alerts"""
     __tablename__ = 'alerts'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -77,6 +83,7 @@ class Alert(db.Model):
 
 
 class Portfolio(db.Model):
+    """User portfolio holdings"""
     __tablename__ = 'portfolio'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -101,6 +108,7 @@ class Portfolio(db.Model):
 
 
 class SearchHistory(db.Model):
+    """Track user search history"""
     __tablename__ = 'search_history'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -108,3 +116,67 @@ class SearchHistory(db.Model):
     symbol = db.Column(db.String(20), nullable=False)
     exchange = db.Column(db.String(10), nullable=False)
     searched_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class PredictionLog(db.Model):
+    """AI prediction logs for backtesting"""
+    __tablename__ = 'prediction_logs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    symbol = db.Column(db.String(20), nullable=False, index=True)
+    exchange = db.Column(db.String(10), nullable=False)
+
+    # Prediction details
+    prediction_date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    timeframe = db.Column(db.String(20), nullable=False)  # intraday, weekly, monthly, longterm
+    predicted_price = db.Column(db.Float, nullable=False)
+    predicted_change_pct = db.Column(db.Float, nullable=False)
+    confidence = db.Column(db.Integer, nullable=False)
+    current_price_at_prediction = db.Column(db.Float, nullable=False)
+
+    # Actual results (filled later)
+    target_date = db.Column(db.DateTime, nullable=False, index=True)
+    actual_price = db.Column(db.Float)
+    actual_change_pct = db.Column(db.Float)
+
+    # Accuracy metrics (calculated later)
+    is_accurate = db.Column(db.Boolean, default=False)  # Within 5% margin
+    accuracy_pct = db.Column(db.Float)
+    profit_if_followed = db.Column(db.Float)  # If user acted on prediction
+
+    # NEW FIELDS - REQUIRED FOR BACKTESTING
+    profit_loss_pct = db.Column(db.Float)  # Simulated P&L with stop loss
+    is_validated = db.Column(db.Boolean, default=False, index=True, nullable=False)
+    validated_at = db.Column(db.DateTime)
+
+    # Metadata
+    model_version = db.Column(db.String(20), default='v3.0')
+    features_used = db.Column(db.Integer, default=28)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'symbol': self.symbol,
+            'exchange': self.exchange,
+            'prediction_date': self.prediction_date.isoformat(),
+            'timeframe': self.timeframe,
+            'predicted_price': self.predicted_price,
+            'predicted_change_pct': self.predicted_change_pct,
+            'confidence': self.confidence,
+            'current_price_at_prediction': self.current_price_at_prediction,
+            'target_date': self.target_date.isoformat() if self.target_date else None,
+            'actual_price': self.actual_price,
+            'actual_change_pct': self.actual_change_pct,
+            'is_accurate': self.is_accurate,
+            'accuracy_pct': self.accuracy_pct,
+            'profit_if_followed': self.profit_if_followed,
+            'profit_loss_pct': self.profit_loss_pct,
+            'is_validated': self.is_validated,
+            'validated_at': self.validated_at.isoformat() if self.validated_at else None,
+            'model_version': self.model_version,
+            'features_used': self.features_used
+        }
+
+    def __repr__(self):
+        return f'<PredictionLog {self.symbol} {self.timeframe} {self.prediction_date}>'
