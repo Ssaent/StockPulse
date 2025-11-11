@@ -15,6 +15,7 @@ import {
   Bell,
   AlertTriangle,
   Loader2,
+  MessageSquare,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { stockAPI, watchlistAPI } from '../services/api';
@@ -152,11 +153,36 @@ export default function Dashboard() {
     setResultsOpen(false);
     setSearchResults([]);
     try {
+      console.log('🔍 Starting analysis for:', symbol);
       const res = await stockAPI.analyze(symbol, 'NSE');
+      console.log('📊 Analysis response:', res.data);
+
       if (!mountedRef.current) return;
       setSelectedStock(res.data);
+
+      // ✅ AUTO-SAVE: Save analysis to history
+      try {
+        const savePayload = {
+          symbol: res.data.symbol,
+          name: res.data.name || res.data.symbol,
+          exchange: res.data.exchange || 'NSE',
+          currentPrice: res.data.currentPrice,
+          predictions: res.data.predictions,
+          technical: res.data.technical
+        };
+
+        console.log('💾 Attempting to save analysis:', savePayload);
+        const saveResponse = await stockAPI.saveAnalysis(savePayload);
+        console.log('✅ Save response:', saveResponse.data);
+        console.log('✅ Analysis saved to history:', res.data.symbol);
+      } catch (saveError) {
+        console.error('❌ Failed to save analysis to history:', saveError);
+        console.error('❌ Error details:', saveError.response?.data);
+        console.error('❌ Error status:', saveError.response?.status);
+        // Don't block the UI if save fails - analysis still shows
+      }
     } catch (error) {
-      console.error('Analysis error:', error);
+      console.error('❌ Analysis error:', error);
       alert('Failed to analyze stock. Please try again.');
     } finally {
       if (mountedRef.current) setAnalyzing(false);
@@ -186,12 +212,11 @@ export default function Dashboard() {
   const addToWatchlist = async (stk) => {
     const prev = selectedStock;
     try {
-      // optimistic toast-ish state (optional)
       await watchlistAPI.add(stk.symbol, stk.exchange);
       alert('Added to watchlist!');
     } catch (err) {
       console.error(err);
-      setSelectedStock(prev); // revert if you had local change
+      setSelectedStock(prev);
       alert(err.response?.data?.error || 'Failed to add to watchlist');
     }
   };
@@ -203,6 +228,7 @@ export default function Dashboard() {
       { to: '/alerts', icon: Bell, label: 'Alerts' },
       { to: '/watchlist', icon: Star, label: 'Watchlist' },
       { to: '/portfolio', icon: Briefcase, label: 'Portfolio' },
+      { to: '/chat', icon: MessageSquare, label: 'Chat' },
     ],
     []
   );
@@ -218,8 +244,13 @@ export default function Dashboard() {
       >
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+            {/* Clickable Logo */}
+            <Link
+              to="/dashboard"
+              className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer group"
+              title="Go to Dashboard"
+            >
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform"
                 style={{
                   background:
                     'linear-gradient(135deg, rgba(59,130,246,0.22) 0%, rgba(168,85,247,0.22) 100%)',
@@ -233,7 +264,7 @@ export default function Dashboard() {
               <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">
                 StockPulse
               </h1>
-            </div>
+            </Link>
 
             <div className="flex items-center gap-2 md:gap-3">
               {headerActions.map(({ to, icon: Icon, label }) => (
@@ -344,11 +375,122 @@ export default function Dashboard() {
           </div>
         </RgvPanel>
 
-        {/* Loading */}
+        {/* Loading - Enhanced Stock Chart Animation */}
         {analyzing && (
           <RgvPanel className="text-center">
-            <div className="animate-spin w-12 h-12 border-4 border-blue-500/60 border-t-transparent rounded-full mx-auto mb-4" />
-            <p className="text-gray-400 mb-6">Analyzing stock with AI…</p>
+            {/* Stock Chart Loader */}
+            <div className="relative h-64 mb-6">
+              {/* Animated Candlesticks */}
+              <div className="absolute inset-0 flex items-end justify-around px-8 pb-8">
+                {[...Array(8)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex flex-col items-center candle-float"
+                    style={{
+                      animationDelay: `${i * 0.1}s`,
+                    }}
+                  >
+                    {/* Wick Top */}
+                    <div
+                      className={`w-0.5 ${i % 2 === 0 ? 'bg-green-400' : 'bg-red-400'} opacity-60 wick-pulse`}
+                      style={{
+                        height: `${15 + Math.random() * 15}px`,
+                        animationDelay: `${i * 0.1}s`,
+                      }}
+                    />
+                    {/* Candle Body */}
+                    <div
+                      className={`w-3 rounded-sm ${
+                        i % 2 === 0
+                          ? 'bg-gradient-to-b from-green-400 to-green-600'
+                          : 'bg-gradient-to-b from-red-400 to-red-600'
+                      } body-pulse`}
+                      style={{
+                        height: `${30 + Math.random() * 40}px`,
+                        boxShadow: `0 0 10px ${i % 2 === 0 ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)'}`,
+                        animationDelay: `${i * 0.1}s`,
+                      }}
+                    />
+                    {/* Wick Bottom */}
+                    <div
+                      className={`w-0.5 ${i % 2 === 0 ? 'bg-green-400' : 'bg-red-400'} opacity-60 wick-pulse-reverse`}
+                      style={{
+                        height: `${10 + Math.random() * 10}px`,
+                        animationDelay: `${i * 0.1}s`,
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Animated Line Chart Overlay */}
+              <svg className="absolute inset-0 w-full h-full opacity-50" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#10b981" stopOpacity="0.8" />
+                    <stop offset="50%" stopColor="#3b82f6" stopOpacity="0.8" />
+                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.8" />
+                  </linearGradient>
+                </defs>
+                <path
+                  d="M 0 150 Q 100 80, 200 120 T 400 100 T 600 130"
+                  fill="none"
+                  stroke="url(#lineGradient)"
+                  strokeWidth="3"
+                  className="line-draw"
+                />
+              </svg>
+
+              {/* Pulse Dots */}
+              {[25, 50, 75].map((pos, i) => (
+                <div
+                  key={i}
+                  className="absolute w-3 h-3 bg-blue-500 rounded-full pulse-dot"
+                  style={{
+                    left: `${pos}%`,
+                    top: '50%',
+                    boxShadow: '0 0 20px rgba(59,130,246,0.6)',
+                    animationDelay: `${i * 0.3}s`,
+                  }}
+                />
+              ))}
+
+              {/* Progress Bar */}
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-green-500 via-blue-500 to-purple-500 progress-move" />
+              </div>
+            </div>
+
+            {/* Loading Text */}
+            <p className="text-gray-400 mb-2 text-lg font-medium animate-pulse">
+              Analyzing stock with AI…
+            </p>
+            <div className="flex items-center justify-center gap-2 text-sm text-gray-500 mb-6">
+              <span className="animate-pulse">Fetching data</span>
+              <span className="text-gray-600">•</span>
+              <span className="animate-pulse" style={{ animationDelay: '0.3s' }}>Training model</span>
+              <span className="text-gray-600">•</span>
+              <span className="animate-pulse" style={{ animationDelay: '0.6s' }}>Generating predictions</span>
+            </div>
+
+            {/* Floating Percentage Numbers */}
+            <div className="relative h-12 mb-4">
+              {['↑ 2.5%', '↓ 1.8%', '↑ 3.2%', '→ 0.5%', '↑ 4.1%'].map((num, i) => (
+                <span
+                  key={i}
+                  className={`absolute text-lg font-bold float-up ${
+                    num.includes('↑') ? 'text-green-400' : num.includes('↓') ? 'text-red-400' : 'text-gray-400'
+                  }`}
+                  style={{
+                    left: `${15 + i * 17}%`,
+                    animationDelay: `${i * 0.4}s`,
+                  }}
+                >
+                  {num}
+                </span>
+              ))}
+            </div>
+
             <StockAnalysisSkeleton />
           </RgvPanel>
         )}

@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { TrendingUp, Mail, Lock, AlertCircle, CheckCircle } from 'lucide-react';
-import NamasteWelcome from '../components/NamasteWelcome'; // <- adjust path if different
+import NamasteWelcome from '../components/NamasteWelcome';
 
 export default function Register() {
   const [email, setEmail] = useState('');
@@ -10,9 +10,16 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(false); // <- NEW
-  const { register } = useAuth();
+  const [showWelcome, setShowWelcome] = useState(false);
+  const { register, user } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,27 +39,23 @@ export default function Register() {
 
     try {
       await register(email, password);
-
-      // Show welcome overlay first
       setShowWelcome(true);
-      // Navigation will happen in <NamasteWelcome onComplete=... />
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed. Please try again.');
-    } finally {
       setLoading(false);
     }
   };
 
+  const handleWelcomeComplete = () => {
+    navigate('/dashboard', { replace: true }); // ← FIXED: Added replace: true
+  };
+
   return (
     <>
-      {/* Welcome overlay (appears after successful register) */}
       {showWelcome && (
         <NamasteWelcome
           userName={email.split('@')[0] || 'Trader'}
-          onComplete={() => {
-            setShowWelcome(false);
-            navigate('/dashboard');
-          }}
+          onComplete={handleWelcomeComplete}
         />
       )}
 

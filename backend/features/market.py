@@ -1,6 +1,6 @@
 """
 Real-time Market Data API
-Provides live NIFTY 50 and SENSEX data
+Provides live NIFTY 50, SENSEX, Gold, and Silver data
 backend/features/market.py
 """
 
@@ -88,6 +88,105 @@ def get_market_data():
         print(f"Error fetching market data: {e}")
         return jsonify({
             'error': 'Failed to fetch market data',
+            'message': str(e)
+        }), 500
+
+
+@market_bp.route('/indices', methods=['GET'])
+def get_market_indices():
+    """
+    Get real-time market indices including NIFTY, SENSEX, Gold, and Silver
+    Returns comprehensive market data for ticker display
+    """
+    try:
+        # Fetch NIFTY 50
+        nifty = yf.Ticker("^NSEI")
+        nifty_hist = nifty.history(period='2d')
+
+        # Fetch SENSEX
+        sensex = yf.Ticker("^BSESN")
+        sensex_hist = sensex.history(period='2d')
+
+        # Fetch Gold (GC=F is Gold Futures in USD/oz)
+        gold = yf.Ticker("GC=F")
+        gold_hist = gold.history(period='2d')
+
+        # Fetch Silver (SI=F is Silver Futures in USD/oz)
+        silver = yf.Ticker("SI=F")
+        silver_hist = silver.history(period='2d')
+
+        # Helper function to calculate change
+        def calculate_change(data):
+            if len(data) >= 2:
+                current = float(data['Close'].iloc[-1])
+                previous = float(data['Close'].iloc[-2])
+                change = current - previous
+                change_percent = (change / previous) * 100
+                return {
+                    'value': round(current, 2),
+                    'change': round(change, 2),
+                    'changePercent': round(change_percent, 2)
+                }
+            elif len(data) == 1:
+                # If only one day of data, use Open as previous
+                current = float(data['Close'].iloc[-1])
+                previous = float(data['Open'].iloc[-1])
+                change = current - previous
+                change_percent = (change / previous) * 100 if previous else 0
+                return {
+                    'value': round(current, 2),
+                    'change': round(change, 2),
+                    'changePercent': round(change_percent, 2)
+                }
+            return {'value': 0, 'change': 0, 'changePercent': 0}
+
+        # Calculate NIFTY
+        nifty_data = calculate_change(nifty_hist)
+
+        # Calculate SENSEX
+        sensex_data = calculate_change(sensex_hist)
+
+        # Calculate Gold (convert from USD/oz to INR/10g)
+        # 1 troy ounce = 31.1035 grams
+        # Current USD to INR rate (approximate - you can use a live API)
+        usd_to_inr = 83.0  # Update this with live rate if needed
+        gold_raw = calculate_change(gold_hist)
+        gold_data = {
+            'value': round(gold_raw['value'] * usd_to_inr / 31.1035 * 10, 0),  # Per 10 grams
+            'change': round(gold_raw['change'] * usd_to_inr / 31.1035 * 10, 0),
+            'changePercent': gold_raw['changePercent']
+        }
+
+        # Calculate Silver (convert from USD/oz to INR/kg)
+        silver_raw = calculate_change(silver_hist)
+        silver_data = {
+            'value': round(silver_raw['value'] * usd_to_inr / 31.1035 * 1000, 0),  # Per kilogram
+            'change': round(silver_raw['change'] * usd_to_inr / 31.1035 * 1000, 0),
+            'changePercent': silver_raw['changePercent']
+        }
+
+        # Get current timestamp in IST
+        ist = pytz.timezone('Asia/Kolkata')
+        now_ist = datetime.now(ist)
+
+        return jsonify({
+            'nifty': nifty_data,
+            'sensex': sensex_data,
+            'gold': gold_data,
+            'silver': silver_data,
+            'timestamp': now_ist.isoformat(),
+            'currency': {
+                'gold': 'INR per 10g',
+                'silver': 'INR per kg'
+            }
+        }), 200
+
+    except Exception as e:
+        print(f"Error fetching market indices: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'error': 'Failed to fetch market indices',
             'message': str(e)
         }), 500
 

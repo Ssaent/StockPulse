@@ -1,95 +1,123 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-
 import Landing from './pages/Landing';
 import Login from './pages/Login';
-import Alerts from './pages/Alerts';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Watchlist from './pages/Watchlist';
 import Portfolio from './pages/Portfolio';
+import Alerts from './pages/Alerts';
 import Backtesting from './pages/Backtesting';
 import MarketNews from './pages/MarketNews';
+import ChatSidebar from './components/chat/ChatSidebar';
+import ChatToggleButton from './components/chat/ChatToggleButton';
+import { useWebSocketChat } from './hooks/useWebSocketChat';
 
-// Protected route wrapper
-function ProtectedRoute({ children }) {
+function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
-  const location = useLocation();
 
-  // Still loading auth state
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full"></div>
       </div>
     );
   }
 
-  // Not authenticated - redirect to login
-  if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
+  return user ? children : <Navigate to="/login" />;
+}
 
-  // Authenticated - render children
-  return children;
+function AppContent() {
+  const { user } = useAuth();
+  const [chatOpen, setChatOpen] = useState(false);
+
+  // Get token and online count for the toggle button
+  const token = localStorage.getItem('token');
+  const { onlineCount } = useWebSocketChat(token);
+
+  return (
+    <>
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Landing />} />
+        <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
+        <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <Register />} />
+
+        {/* Protected Routes */}
+        <Route
+          path="/dashboard"
+          element={
+            <PrivateRoute>
+              <Dashboard />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/watchlist"
+          element={
+            <PrivateRoute>
+              <Watchlist />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/portfolio"
+          element={
+            <PrivateRoute>
+              <Portfolio />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/alerts"
+          element={
+            <PrivateRoute>
+              <Alerts />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/backtesting"
+          element={
+            <PrivateRoute>
+              <Backtesting />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/news"
+          element={
+            <PrivateRoute>
+              <MarketNews />
+            </PrivateRoute>
+          }
+        />
+      </Routes>
+
+      {/* Global Chat - Only show for logged-in users */}
+      {user && (
+        <>
+          <ChatToggleButton
+            onClick={() => setChatOpen(true)}
+            onlineCount={onlineCount}
+            isOpen={chatOpen}
+          />
+          <ChatSidebar
+            isOpen={chatOpen}
+            onClose={() => setChatOpen(false)}
+          />
+        </>
+      )}
+    </>
+  );
 }
 
 function App() {
   return (
     <AuthProvider>
       <Router>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/watchlist"
-            element={
-              <ProtectedRoute>
-                <Watchlist />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/backtesting"
-            element={
-              <ProtectedRoute>
-                <Backtesting />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/alerts" element={<Alerts />} />
-
-          <Route
-            path="/portfolio"
-            element={
-              <ProtectedRoute>
-                <Portfolio />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/news"
-            element={
-              <ProtectedRoute>
-                <MarketNews />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
+        <AppContent />
       </Router>
     </AuthProvider>
   );

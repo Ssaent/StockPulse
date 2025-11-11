@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft, Briefcase, Plus, Trash2, TrendingUp, TrendingDown, RefreshCw, X
 } from 'lucide-react';
-import { portfolioAPI } from '../services/api';
+import { portfolioAPI, stockAPI } from '../services/api';
 
 /* =========================
    RGV primitives
@@ -14,7 +14,7 @@ function rgvError(e) {
   if (s === 400) return 'Bad input. Tighten it.';
   if (s === 401) return 'Session dead. Walk back in.';
   if (s === 403) return 'Not your scene.';
-  if (s === 404) return 'It doesn’t exist. Stop chasing shadows.';
+  if (s === 404) return "It doesn't exist. Stop chasing shadows.";
   if (s === 429) return 'Too many hits. Breathe.';
   if (s >= 500) return 'Server broke character. Try again.';
   if (e?.message?.includes('Network')) return 'Network silent. Plug it back.';
@@ -142,7 +142,7 @@ export default function Portfolio() {
   const askRemove = (id) => {
     setConfirm({
       open: true,
-      message: 'Remove this holding? Once it exits, it’s out of your story.',
+      message: "Remove this holding? Once it exits, it's out of your story.",
       onConfirm: async () => {
         setConfirm({ open: false, message: '', onConfirm: null });
         try {
@@ -352,11 +352,66 @@ function AddHoldingModal({ onClose, onSuccess, onErr }) {
   });
   const [loading, setLoading] = useState(false);
 
+  // Stock search states
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [stockName, setStockName] = useState('');
+
+  // Search stocks as user types
+  useEffect(() => {
+    const searchStocks = async () => {
+      if (formData.symbol.length < 2) {
+        setSearchResults([]);
+        setShowSuggestions(false);
+        return;
+      }
+
+      setSearching(true);
+      try {
+        const res = await stockAPI.search(formData.symbol, formData.exchange);
+        setSearchResults(res.data.results || []);
+        setShowSuggestions(true);
+      } catch (error) {
+        console.error('Search error:', error);
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
+    };
+
+    const timer = setTimeout(searchStocks, 300);
+    return () => clearTimeout(timer);
+  }, [formData.symbol, formData.exchange]);
+
+  const handleStockSelect = (stock) => {
+    setFormData({ ...formData, symbol: stock.symbol });
+    setStockName(stock.name);
+    setShowSuggestions(false);
+  };
+
   const disabled = !formData.symbol || !formData.quantity || !formData.buy_price || !formData.buy_date;
 
   const submit = async (e) => {
     e.preventDefault();
     if (disabled) return;
+
+    // Verify stock exists
+    try {
+      const res = await stockAPI.search(formData.symbol, formData.exchange);
+      const stockExists = res.data.results?.some(
+        (s) => s.symbol.toUpperCase() === formData.symbol.toUpperCase()
+      );
+
+      if (!stockExists) {
+        onErr({ message: `Stock "${formData.symbol}" not found in ${formData.exchange}. Select from suggestions.` });
+        return;
+      }
+    } catch (error) {
+      onErr({ message: 'Error validating stock. Try again.' });
+      return;
+    }
+
     setLoading(true);
     try {
       await portfolioAPI.add({
@@ -375,81 +430,201 @@ function AddHoldingModal({ onClose, onSuccess, onErr }) {
     }
   };
 
+  // Calculate total investment
+  const totalInvestment = formData.quantity && formData.buy_price
+    ? (Number(formData.quantity) * Number(formData.buy_price)).toFixed(2)
+    : '0.00';
+
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-      <NolanShell className="max-w-md w-full">
-        <div className="flex items-start justify-between mb-4">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-6 overflow-y-auto">
+      <NolanShell className="max-w-2xl w-full my-8">
+        <div className="flex items-start justify-between mb-6">
           <h3 className="text-2xl font-bold">Add Holding</h3>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/10">
             <X className="w-5 h-5 text-gray-300" />
           </button>
         </div>
 
-        <form onSubmit={submit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">Stock Symbol</label>
-            <input
-              type="text"
-              value={formData.symbol}
-              onChange={(e) => setFormData({ ...formData, symbol: e.target.value.toUpperCase() })}
-              className="input"
-              placeholder="e.g., RELIANCE"
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Quantity</label>
+        <form onSubmit={submit} className="space-y-6">
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Stock Symbol with Search */}
+            <div className="relative">
+              <label className="block text-sm font-medium mb-2 text-gray-300">
+                Stock Symbol / Name
+              </label>
               <input
-                type="number"
+                type="text"
+                value={formData.symbol}
+                onChange={(e) => {
+                  setFormData({ ...formData, symbol: e.target.value.toUpperCase() });
+                  setStockName('');
+                }}
+                onFocus={() => formData.symbol.length >= 2 && setShowSuggestions(true)}
+                className="input"
+                placeholder="e.g., RELIANCE"
+                disabled={loading}
+                required
+              />
+              {stockName && (
+                <p className="text-xs text-green-400 mt-1">✓ {stockName}</p>
+              )}
+
+              {/* Search Suggestions Dropdown */}
+              {showSuggestions && searchResults.length > 0 && (
+                <div className="absolute z-50 mt-2 w-full bg-slate-900 border border-white/20 rounded-lg shadow-2xl max-h-60 overflow-auto">
+                  {searchResults.map((stock) => (
+                    <button
+                      key={stock.symbol}
+                      type="button"
+                      onClick={() => handleStockSelect(stock)}
+                      className="w-full text-left px-4 py-3 hover:bg-white/10 border-b border-white/10 transition"
+                    >
+                      <div className="font-bold text-white">{stock.symbol}</div>
+                      <div className="text-xs text-gray-400">{stock.name}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {searching && (
+                <p className="text-xs text-gray-400 mt-1">Searching...</p>
+              )}
+
+              {formData.symbol.length >= 2 && !searching && searchResults.length === 0 && (
+                <p className="text-xs text-red-400 mt-1">No stocks found</p>
+              )}
+            </div>
+
+            {/* Exchange */}
+            <div>
+              <label className="block text-sm font-medium mb-2 text-gray-300">
+                Exchange
+              </label>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, exchange: 'NSE' })}
+                  disabled={loading}
+                  className={`flex-1 px-4 py-3 rounded-lg border-2 transition font-medium ${
+                    formData.exchange === 'NSE'
+                      ? 'bg-blue-500/20 border-blue-500 text-blue-300'
+                      : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/30'
+                  } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  NSE
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, exchange: 'BSE' })}
+                  disabled={loading}
+                  className={`flex-1 px-4 py-3 rounded-lg border-2 transition font-medium ${
+                    formData.exchange === 'BSE'
+                      ? 'bg-purple-500/20 border-purple-500 text-purple-300'
+                      : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/30'
+                  } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  BSE
+                </button>
+              </div>
+            </div>
+
+            {/* Quantity - No Arrows */}
+            <div>
+              <label className="block text-sm font-medium mb-2 text-gray-300">
+                Quantity (Shares)
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
                 value={formData.quantity}
-                onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                className="input"
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9]/g, '');
+                  setFormData({ ...formData, quantity: value });
+                }}
+                className="input text-xl font-semibold"
                 placeholder="100"
+                disabled={loading}
                 required
               />
             </div>
+
+            {/* Buy Price - No Arrows */}
             <div>
-              <label className="block text-sm font-medium mb-2">Buy Price</label>
+              <label className="block text-sm font-medium mb-2 text-gray-300">
+                Buy Price (₹)
+              </label>
               <input
-                type="number"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={formData.buy_price}
-                onChange={(e) => setFormData({ ...formData, buy_price: e.target.value })}
-                className="input"
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9.]/g, '');
+                  const parts = value.split('.');
+                  if (parts.length > 2) return;
+                  setFormData({ ...formData, buy_price: value });
+                }}
+                className="input text-xl font-semibold"
                 placeholder="2400.00"
+                disabled={loading}
                 required
+              />
+            </div>
+
+            {/* Buy Date */}
+            <div>
+              <label className="block text-sm font-medium mb-2 text-gray-300">
+                Buy Date
+              </label>
+              <input
+                type="date"
+                value={formData.buy_date}
+                onChange={(e) => setFormData({ ...formData, buy_date: e.target.value })}
+                className="input"
+                disabled={loading}
+                required
+              />
+            </div>
+
+            {/* Notes */}
+            <div>
+              <label className="block text-sm font-medium mb-2 text-gray-300">
+                Notes (Optional)
+              </label>
+              <textarea
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                className="input"
+                rows="3"
+                placeholder="Long term hold..."
+                disabled={loading}
               />
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Buy Date</label>
-            <input
-              type="date"
-              value={formData.buy_date}
-              onChange={(e) => setFormData({ ...formData, buy_date: e.target.value })}
-              className="input"
-              required
-            />
-          </div>
+          {/* Investment Summary */}
+          {formData.quantity && formData.buy_price && (
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-300">Total Investment:</span>
+                <span className="text-2xl font-bold text-blue-300">
+                  ₹{Number(totalInvestment).toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  })}
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 mt-2">
+                {formData.quantity} shares × ₹{Number(formData.buy_price).toFixed(2)} per share
+              </p>
+            </div>
+          )}
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Notes (Optional)</label>
-            <textarea
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              className="input"
-              rows="3"
-              placeholder="Long term. Don’t babysit."
-            />
-          </div>
-
+          {/* Form Actions */}
           <div className="flex gap-3">
             <button
               type="button"
               onClick={onClose}
+              disabled={loading}
               className="flex-1 px-4 py-3 glass rounded-lg hover:bg-white/10 transition-all"
             >
               Cancel

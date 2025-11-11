@@ -34,7 +34,6 @@ export const AuthProvider = ({ children }) => {
       setUser(response.data.user);
     } catch (error) {
       console.error('Auth check failed:', error);
-      // Only clear token if it's actually invalid (401)
       if (error.response?.status === 401) {
         localStorage.removeItem('token');
         setUser(null);
@@ -47,9 +46,10 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       const response = await authAPI.login(email, password);
-      const { access_token, user } = response.data;
+      const { token, user } = response.data;
 
-      localStorage.setItem('token', access_token);
+      localStorage.setItem('token', token);
+      console.log('✅ Token saved to localStorage:', token);
       setUser(user);
 
       return user;
@@ -62,9 +62,10 @@ export const AuthProvider = ({ children }) => {
   const register = async (email, password) => {
     try {
       const response = await authAPI.register(email, password);
-      const { access_token, user } = response.data;
+      const { token, user } = response.data;
 
-      localStorage.setItem('token', access_token);
+      localStorage.setItem('token', token);
+      console.log('✅ Token saved to localStorage:', token);
       setUser(user);
 
       return user;
@@ -77,6 +78,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
+    // Simple - just clear token, let ProtectedRoute handle redirect
   };
 
   const value = {
@@ -88,7 +90,6 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated: !!user
   };
 
-  // Don't render children until auth check is complete
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950">

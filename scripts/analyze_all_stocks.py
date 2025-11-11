@@ -1,335 +1,275 @@
 """
-Dynamic Stock Analysis Script
-Automatically fetches:
-- NIFTY 50 stocks
-- 50 Random mid-cap stocks
-- 50 Random small-cap stocks
-Total: 150 stocks analyzed
+Fixed Stock Analysis Script - Ensures Real Predictions
+Analyzes NIFTY 50 + Random 100 stocks (mid-cap + small-cap)
 """
 
 import sys
 import os
-from datetime import datetime, timedelta
-import random
-import yfinance as yf
-import pandas as pd
-
-# Add backend to path
-backend_dir = os.path.join(os.path.dirname(__file__), '..', 'backend')
-sys.path.insert(0, backend_dir)
-os.chdir(backend_dir)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
 from app import create_app
 from database.models import db, PredictionLog
-from data_fetchers.price_fetcher import RealTimePriceFetcher
-from ai_engine.advanced_lstm import AdvancedStockPredictor
-from ai_engine.feature_engineer import FeatureEngineer
-from ai_engine.technical_analyzer import TechnicalAnalyzer
-
+from services.ai_predictor import StockPredictor
+import yfinance as yf
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+import random
+import warnings
+warnings.filterwarnings('ignore')
 
 def get_nifty50_stocks():
-    """Fetch NIFTY 50 stocks dynamically"""
-    print("📊 Fetching NIFTY 50 stocks...")
-
-    try:
-        # Get NIFTY 50 index data
-        nifty = yf.Ticker("^NSEI")
-
-        # NIFTY 50 constituent symbols (most common ones)
-        nifty50 = [
-            'RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK',
-            'HINDUNILVR', 'ITC', 'SBIN', 'BHARTIARTL', 'KOTAKBANK',
-            'LT', 'AXISBANK', 'ASIANPAINT', 'MARUTI', 'TITAN',
-            'SUNPHARMA', 'ULTRACEMCO', 'NESTLEIND', 'BAJFINANCE', 'WIPRO',
-            'HCLTECH', 'POWERGRID', 'NTPC', 'TATAMOTORS', 'ONGC',
-            'COALINDIA', 'ADANIPORTS', 'JSWSTEEL', 'TATASTEEL', 'GRASIM',
-            'INDUSINDBK', 'M&M', 'TECHM', 'BRITANNIA', 'HINDALCO',
-            'BAJAJFINSV', 'DRREDDY', 'HEROMOTOCO', 'CIPLA', 'EICHERMOT',
-            'DIVISLAB', 'SHREECEM', 'APOLLOHOSP', 'BPCL', 'TATACONSUM',
-            'ADANIENT', 'SBILIFE', 'HDFCLIFE', 'BAJAJ-AUTO', 'LTIM'
-        ]
-
-        # Verify stocks exist by checking if we can fetch their data
-        verified_stocks = []
-        for symbol in nifty50:
-            try:
-                ticker = yf.Ticker(f"{symbol}.NS")
-                info = ticker.info
-                if info and 'symbol' in info:
-                    verified_stocks.append(symbol)
-            except:
-                continue
-
-        print(f"✅ Found {len(verified_stocks)} NIFTY 50 stocks")
-        return verified_stocks
-
-    except Exception as e:
-        print(f"⚠️  Error fetching NIFTY 50: {e}")
-        print("Using fallback list...")
-        return [
-            'RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK',
-            'HINDUNILVR', 'ITC', 'SBIN', 'BHARTIARTL', 'KOTAKBANK',
-            'LT', 'AXISBANK', 'ASIANPAINT', 'MARUTI', 'TITAN',
-            'SUNPHARMA', 'ULTRACEMCO', 'NESTLEIND', 'BAJFINANCE', 'WIPRO'
-        ]
-
+    """Get NIFTY 50 stocks"""
+    nifty50 = [
+        'RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK', 'HINDUNILVR', 'ITC',
+        'SBIN', 'BHARTIARTL', 'BAJFINANCE', 'KOTAKBANK', 'LT', 'AXISBANK',
+        'ASIANPAINT', 'MARUTI', 'TITAN', 'SUNPHARMA', 'ULTRACEMCO', 'NESTLEIND',
+        'WIPRO', 'ONGC', 'NTPC', 'POWERGRID', 'TATAMOTORS', 'TATASTEEL', 'M&M',
+        'TECHM', 'BAJAJFINSV', 'HCLTECH', 'ADANIPORTS', 'DRREDDY', 'COALINDIA',
+        'INDUSINDBK', 'JSWSTEEL', 'GRASIM', 'DIVISLAB', 'APOLLOHOSP', 'EICHERMOT',
+        'BRITANNIA', 'CIPLA', 'SHREECEM', 'SBILIFE', 'HEROMOTOCO', 'UPL',
+        'HINDALCO', 'TATACONSUM', 'BAJAJ-AUTO', 'ADANIENT', 'BPCL', 'HDFCLIFE'
+    ]
+    return [{'symbol': s, 'category': 'NIFTY 50'} for s in nifty50]
 
 def get_midcap_stocks(count=50):
-    """Fetch random mid-cap stocks"""
-    print(f"📊 Fetching {count} mid-cap stocks...")
-
-    # Common mid-cap stocks
-    midcap_universe = [
-        'ABBOTINDIA', 'ACC', 'ADANIGREEN', 'ADANIPOWER', 'ALKEM',
-        'AMBUJACEM', 'AUROPHARMA', 'BAJAJHLDNG', 'BANDHANBNK', 'BANKBARODA',
-        'BERGEPAINT', 'BEL', 'BIOCON', 'BOSCHLTD', 'CANBK',
-        'CHAMBLFERT', 'CHOLAFIN', 'COLPAL', 'CONCOR', 'COROMANDEL',
-        'DABUR', 'DALBHARAT', 'DEEPAKNTR', 'DELTACORP', 'DLF',
-        'ESCORTS', 'GAIL', 'GLENMARK', 'GODREJCP', 'GODREJPROP',
-        'GUJGASLTD', 'HAVELLS', 'HDFCAMC', 'HINDPETRO', 'ICICIPRULI',
-        'IDFCFIRSTB', 'INDHOTEL', 'INDIGO', 'IOC', 'JINDALSTEL',
-        'L&TFH', 'LICHSGFIN', 'LUPIN', 'MARICO', 'MCDOWELL-N',
-        'METROPOLIS', 'MFSL', 'MGL', 'MPHASIS', 'MRF',
-        'NATIONALUM', 'NAUKRI', 'NMDC', 'OFSS', 'OIL',
-        'PAGEIND', 'PEL', 'PETRONET', 'PFC', 'PIDILITIND',
-        'PIIND', 'PNB', 'POLYCAB', 'RECLTD', 'SAIL',
-        'SRF', 'SIEMENS', 'TORNTPHARM', 'TRENT', 'TVSMOTOR',
-        'UBL', 'UNITDSPR', 'VEDL', 'VOLTAS', 'ZEEL'
+    """Get random mid-cap stocks"""
+    midcaps = [
+        'CHOLAFIN', 'GODREJCP', 'MCDOWELL-N', 'DABUR', 'BANDHANBNK', 'VOLTAS',
+        'GODREJPROP', 'INDIGO', 'HAVELLS', 'PIDILITIND', 'MARICO', 'MPHASIS',
+        'INDUSTOWER', 'GAIL', 'BERGEPAINT', 'VEDL', 'BOSCHLTD', 'GLAND',
+        'AMBUJACEM', 'ESCORTS', 'MUTHOOTFIN', 'OFSS', 'TATAPOWER', 'ALKEM',
+        'IPCALAB', 'CONCOR', 'NMDC', 'RECLTD', 'INDHOTEL', 'LUPIN', 'CUMMINSIND',
+        'SAIL', 'APOLLOTYRE', 'Dixon', 'JINDALSTEL', 'IRCTC', 'JUBLFOOD',
+        'SUNTV', 'BATAINDIA', 'TRENT', 'IDEA', 'STAR', 'AUROPHARMA', 'BEL',
+        'HAL', 'PERSISTENT', 'COFORGE', 'LICHSGFIN', 'CANFINHOME', 'ABCAPITAL',
+        'PEL', 'DALBHARAT', 'LAURUSLABS', 'RAIN', 'MRF', 'BALKRISIND',
+        'ATUL', 'KPITTECH', 'POLYCAB', 'TORNTPHARM', 'LTTS', 'ZYDUSLIFE',
+        'SRF', 'PAGEIND', 'CASTROLIND', 'ENDURANCE', 'METROPOLIS', 'ASTRAL',
+        'CHAMBLFERT', 'GMRINFRA', 'L&TFH', 'MOTHERSON'
     ]
-
-    # Randomly select
-    selected = random.sample(midcap_universe, min(count, len(midcap_universe)))
-    print(f"✅ Selected {len(selected)} mid-cap stocks")
-    return selected
-
+    return [{'symbol': s, 'category': 'MID CAP'} for s in random.sample(midcaps, min(count, len(midcaps)))]
 
 def get_smallcap_stocks(count=50):
-    """Fetch random small-cap stocks"""
-    print(f"📊 Fetching {count} small-cap stocks...")
-
-    # Common small-cap stocks
-    smallcap_universe = [
-        'AAVAS', 'AARTIIND', 'ABCAPITAL', 'ABFRL', 'AEGISCHEM',
-        'AFFLE', 'AIAENG', 'AJANTPHARM', 'ALKYLAMINE', 'APLLTD',
-        'AMARAJABAT', 'ANANDRATHI', 'ANGELONE', 'APARINDS', 'ASAHIINDIA',
-        'ASHOKLEY', 'ASTERDM', 'ATUL', 'AUROPHARMA', 'AVANTIFEED',
-        'BALRAMCHIN', 'BASF', 'BATAINDIA', 'BHARATFORG', 'BIRLACORPN',
-        'BLUEDART', 'BLUESTARCO', 'BSE', 'CAMPUS', 'CANFINHOME',
-        'CAPLIPOINT', 'CARBORUNIV', 'CDSL', 'CEATLTD', 'CENTURYTEX',
-        'CERA', 'CHALET', 'CHEMCON', 'CLEAN', 'COALINDIA',
-        'COCHINSHIP', 'COFORGE', 'CROMPTON', 'CUMMINSIND', 'CYIENT',
-        'DCMSHRIRAM', 'DEEPAKFERT', 'DHANI', 'DIXON', 'DMART',
-        'EMAMILTD', 'ENDURANCE', 'FINEORG', 'GICRE', 'GILLETTE',
-        'GLAXO', 'GLENMARK', 'GMM', 'GNFC', 'GODFRYPHLP',
-        'GRANULES', 'GRAPHITE', 'GREAVESCOT', 'GRINDWELL', 'GSFC',
-        'GSHIPPO', 'GULFOILLUB', 'HAL', 'HAPPSTMNDS', 'HATSUN',
-        'HCG', 'HEG', 'HERITGFOOD', 'HFCL', 'HIKAL'
+    """Get random small-cap stocks"""
+    smallcaps = [
+        'IDFCFIRSTB', 'ZEEL', 'LINDEINDIA', 'NATIONALUM', 'RBLBANK', 'CROMPTON',
+        'GODREJIND', 'ASHOKLEY', 'CENTRALBK', 'FEDERALBNK', 'APLAPOLLO',
+        'CANBK', 'EDELWEISS', 'BHARATFORG', 'DELTACORP', 'CHOLAHLDNG', 'HATSUN',
+        'IEX', 'NILASPACES', 'PNBHOUSING', 'ROUTE', 'SHYAMMETL', 'SOBHA',
+        'SYNGENE', 'TIMKEN', 'UJJIVAN', 'VARROC', 'WELCORP', 'WHIRLPOOL',
+        'GESHIP', 'IFBIND', 'JKCEMENT', 'KANSAINER', 'KAPSTON', 'KEI',
+        'LALPATHLAB', 'MANAPPURAM', 'MRPL', 'NATCOPHARM', 'NAVINFLUOR',
+        'NETWORK18', 'OBEROIRLTY', 'ORIENTELEC', 'PAISALO', 'PARAGMILK',
+        'PGHH', 'PHOENIXLTD', 'PRSMJOHNSN', 'QUESS', 'RAJESHEXPO', 'RAMCOCEM',
+        'RELAXO', 'SADBHAV', 'SCHNEIDER', 'SHARDACROP', 'SJVN', 'SKFINDIA',
+        'SOUTHBANK', 'SPARC', 'SPICEJET', 'SRTRANSFIN', 'STARCEMENT', 'STLTECH',
+        'SUNDRMFAST', 'SUPRAJIT', 'SUPREMEIND', 'SWANENERGY', 'SYMPHONY',
+        'TATAELXSI', 'TCIEXP', 'TECHM', 'THERMAX', 'THYROCARE'
     ]
+    return [{'symbol': s, 'category': 'SMALL CAP'} for s in random.sample(smallcaps, min(count, len(smallcaps)))]
 
-    # Randomly select
-    selected = random.sample(smallcap_universe, min(count, len(smallcap_universe)))
-    print(f"✅ Selected {len(selected)} small-cap stocks")
-    return selected
+def verify_prediction_quality(predicted_price, current_price, confidence):
+    """Verify that prediction makes sense"""
+    if predicted_price == 0 or current_price == 0:
+        return False, "Zero price detected"
 
+    change_pct = ((predicted_price - current_price) / current_price) * 100
 
-def analyze_and_log_stock(symbol, exchange='NSE', category=''):
-    """Analyze a stock and log predictions"""
+    # Check if change is reasonable
+    if abs(change_pct) < 0.01:
+        return False, f"Change too small: {change_pct:.4f}%"
+
+    if abs(change_pct) > 50:
+        return False, f"Change too large: {change_pct:.2f}%"
+
+    if confidence < 50:
+        return False, f"Confidence too low: {confidence}%"
+
+    return True, f"Valid prediction: {change_pct:+.2f}%"
+
+def analyze_stock(symbol, category, predictor):
+    """Analyze a single stock with detailed logging"""
     try:
-        print(f"\n{'=' * 60}")
-        print(f"[{category}] Analyzing {symbol}...")
-        print(f"{'=' * 60}")
+        print(f"\n{'='*60}")
+        print(f"🔍 Analyzing {symbol} ({category})")
+        print(f"{'='*60}")
 
-        # Initialize services
-        price_fetcher = RealTimePriceFetcher()
-        predictor = AdvancedStockPredictor()
-        feature_engineer = FeatureEngineer()
-        tech_analyzer = TechnicalAnalyzer()
+        # Fetch current price
+        ticker = yf.Ticker(f"{symbol}.NS")
+        hist = ticker.history(period='1d')
 
-        # Get historical data (2 years)
-        print(f"📊 Fetching historical data...")
-        hist_data = price_fetcher.get_historical_data(symbol, exchange, period='2y')
-
-        if hist_data is None or hist_data.empty:
+        if hist.empty:
             print(f"❌ No data available for {symbol}")
             return False
 
-        # Feature engineering
-        print(f"🔧 Creating features...")
-        hist_data = feature_engineer.create_features(hist_data)
-        hist_data = hist_data.dropna()
-
-        if len(hist_data) < 100:
-            print(f"❌ Insufficient data: {len(hist_data)} rows")
-            return False
-
-        # Technical indicators
-        hist_data = tech_analyzer.calculate_indicators(hist_data)
-
-        # Get current price
-        current_price = float(hist_data['Close'].iloc[-1])
+        current_price = float(hist['Close'].iloc[-1])
         print(f"💰 Current Price: ₹{current_price:.2f}")
 
-        # Train or load model
-        model_loaded = predictor.load_model(symbol)
-
-        if not model_loaded:
-            print(f"🤖 Training new model...")
-            feature_cols = feature_engineer.select_features()
-            feature_cols = [f for f in feature_cols if f in hist_data.columns]
-
-            predictor.train(hist_data, feature_cols, validation_split=0.2)
-            predictor.save_model(symbol)
-            print(f"✅ Model trained and saved")
-        else:
-            print(f"✅ Loaded pre-trained model")
+        if current_price <= 0:
+            print(f"❌ Invalid price: ₹{current_price}")
+            return False
 
         # Generate predictions
-        print(f"🔮 Generating predictions...")
-        feature_cols = predictor.feature_names
-        predictions = predictor.predict_multi_horizon(hist_data, feature_cols, current_price)
+        print(f"🤖 Generating predictions...")
 
-        # Log predictions to database
-        now = datetime.now()
+        predictions = {
+            'intraday': predictor.predict(symbol, 'intraday'),
+            'weekly': predictor.predict(symbol, 'weekly'),
+            'monthly': predictor.predict(symbol, 'monthly')
+        }
+
+        # Verify and log each prediction
+        valid_predictions = 0
 
         for timeframe, pred_data in predictions.items():
-            # Calculate target date
-            if timeframe == 'intraday':
-                target_date = now + timedelta(days=1)
-            elif timeframe == 'weekly':
-                target_date = now + timedelta(days=7)
-            elif timeframe == 'monthly':
-                target_date = now + timedelta(days=30)
-            else:
-                continue
+            predicted_price = pred_data['predicted_price']
+            confidence = pred_data['confidence']
 
-            prediction = PredictionLog(
-                symbol=symbol,
-                exchange=exchange,
-                prediction_date=now,
-                timeframe=timeframe,
-                predicted_price=pred_data.get('price', current_price),
-                predicted_change_pct=pred_data.get('change_pct', 0),
-                confidence=pred_data.get('confidence', 0),
-                current_price_at_prediction=current_price,
-                target_date=target_date,
-                model_version='v3.0',
-                features_used=len(feature_cols),
-                is_validated=False
-            )
+            # Calculate change
+            change_pct = ((predicted_price - current_price) / current_price) * 100
 
-            db.session.add(prediction)
+            # Verify quality
+            is_valid, message = verify_prediction_quality(predicted_price, current_price, confidence)
 
-            print(f"  {timeframe.upper()}: {pred_data.get('change_pct', 0):+.2f}% "
-                  f"(₹{pred_data.get('price', 0):.2f}) "
-                  f"Confidence: {pred_data.get('confidence', 0)}%")
+            status = "✅" if is_valid else "⚠️"
+            print(f"{status} {timeframe.upper():8} → ₹{predicted_price:.2f} ({change_pct:+.2f}%) | Conf: {confidence}% | {message}")
 
-        db.session.commit()
-        print(f"✅ Predictions logged for {symbol}")
-        return True
+            if is_valid:
+                valid_predictions += 1
+
+                # Calculate target date
+                if timeframe == 'intraday':
+                    target_date = datetime.now() + timedelta(days=1)
+                elif timeframe == 'weekly':
+                    target_date = datetime.now() + timedelta(days=7)
+                else:  # monthly
+                    target_date = datetime.now() + timedelta(days=30)
+
+                # Create prediction log
+                prediction_log = PredictionLog(
+                    symbol=symbol,
+                    exchange='NSE',
+                    prediction_date=datetime.now(),
+                    timeframe=timeframe,
+                    predicted_price=predicted_price,
+                    predicted_change_pct=change_pct,
+                    confidence=confidence,
+                    current_price_at_prediction=current_price,
+                    target_date=target_date,
+                    model_version='v3.0',
+                    features_used=28,
+                    is_validated=False
+                )
+
+                db.session.add(prediction_log)
+
+        if valid_predictions > 0:
+            db.session.commit()
+            print(f"✅ Logged {valid_predictions}/3 valid predictions for {symbol}")
+            return True
+        else:
+            print(f"❌ No valid predictions for {symbol}")
+            return False
 
     except Exception as e:
-        print(f"❌ Error analyzing {symbol}: {e}")
-        db.session.rollback()
+        print(f"❌ Error analyzing {symbol}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return False
 
-
 def main():
-    """Main execution"""
-    print("\n" + "=" * 70)
+    print("="*60)
     print("STOCKPULSE - COMPREHENSIVE MARKET ANALYSIS")
-    print("=" * 70)
-    print(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 70)
+    print("="*60)
 
-    # Get stocks dynamically
-    print("\n🔍 Fetching stock lists...")
-    nifty50 = get_nifty50_stocks()
-    midcap = get_midcap_stocks(50)
-    smallcap = get_smallcap_stocks(50)
-
-    # Combine all stocks
-    all_stocks = []
-    all_stocks.extend([('NIFTY 50', symbol) for symbol in nifty50])
-    all_stocks.extend([('MID CAP', symbol) for symbol in midcap])
-    all_stocks.extend([('SMALL CAP', symbol) for symbol in smallcap])
-
-    print(f"\n📊 Total stocks to analyze: {len(all_stocks)}")
-    print(f"  - NIFTY 50: {len(nifty50)}")
-    print(f"  - Mid Cap: {len(midcap)}")
-    print(f"  - Small Cap: {len(smallcap)}")
-    print("=" * 70)
-
-    # Confirm before proceeding
-    response = input("\n⚠️  This will take 2-4 hours. Continue? (yes/no): ")
-    if response.lower() != 'yes':
-        print("\n❌ Analysis cancelled.")
-        return
-
+    # Create Flask app context
     app = create_app()
 
     with app.app_context():
-        success_count = 0
-        fail_count = 0
+        # Initialize predictor
+        print("\n🤖 Initializing AI Predictor...")
+        predictor = StockPredictor()
 
-        category_stats = {
-            'NIFTY 50': {'success': 0, 'fail': 0},
-            'MID CAP': {'success': 0, 'fail': 0},
-            'SMALL CAP': {'success': 0, 'fail': 0}
+        # Get stock lists
+        print("\n📊 Building stock list...")
+        nifty_stocks = get_nifty50_stocks()
+        midcap_stocks = get_midcap_stocks(50)
+        smallcap_stocks = get_smallcap_stocks(50)
+
+        all_stocks = nifty_stocks + midcap_stocks + smallcap_stocks
+
+        print(f"\n📈 Total stocks to analyze: {len(all_stocks)}")
+        print(f"  - NIFTY 50: {len(nifty_stocks)}")
+        print(f"  - MID CAP: {len(midcap_stocks)}")
+        print(f"  - SMALL CAP: {len(smallcap_stocks)}")
+
+        # Confirm
+        response = input("\n⚠️  This will take 2-4 hours. Continue? (yes/no): ")
+        if response.lower() != 'yes':
+            print("❌ Cancelled")
+            return
+
+        # Analyze all stocks
+        results = {
+            'NIFTY 50': {'success': 0, 'failed': 0},
+            'MID CAP': {'success': 0, 'failed': 0},
+            'SMALL CAP': {'success': 0, 'failed': 0}
         }
 
-        for i, (category, symbol) in enumerate(all_stocks, 1):
-            print(f"\n[{i}/{len(all_stocks)}] Processing {category} - {symbol}...")
+        for i, stock in enumerate(all_stocks, 1):
+            print(f"\n[{i}/{len(all_stocks)}] Processing {stock['category']} - {stock['symbol']}...")
 
-            if analyze_and_log_stock(symbol, category=category):
-                success_count += 1
-                category_stats[category]['success'] += 1
+            success = analyze_stock(stock['symbol'], stock['category'], predictor)
+
+            if success:
+                results[stock['category']]['success'] += 1
             else:
-                fail_count += 1
-                category_stats[category]['fail'] += 1
+                results[stock['category']]['failed'] += 1
 
             # Progress update every 10 stocks
             if i % 10 == 0:
+                total_success = sum(r['success'] for r in results.values())
                 progress = (i / len(all_stocks)) * 100
-                print(f"\n📊 Progress: {progress:.1f}% ({i}/{len(all_stocks)})")
+                print(f"\n📊 Progress: {progress:.1f}% | Successful: {total_success}/{i}")
 
-            # Small delay to avoid overwhelming system
-            import time
-            time.sleep(2)
-
-        # Final Summary
-        print("\n" + "=" * 70)
+        # Final summary
+        print("\n" + "="*60)
         print("ANALYSIS COMPLETE")
-        print("=" * 70)
-        print(f"\n✅ Successfully analyzed: {success_count} stocks")
-        print(f"❌ Failed: {fail_count} stocks")
-        print(f"📈 Success Rate: {(success_count / len(all_stocks) * 100):.1f}%")
+        print("="*60)
+
+        total_success = sum(r['success'] for r in results.values())
+        total_failed = sum(r['failed'] for r in results.values())
+
+        print(f"\n✅ Successfully analyzed: {total_success} stocks")
+        print(f"❌ Failed: {total_failed} stocks")
+        print(f"📈 Success Rate: {(total_success / len(all_stocks) * 100):.1f}%")
 
         print(f"\n📊 By Category:")
-        for category, stats in category_stats.items():
-            total = stats['success'] + stats['fail']
+        for category, stats in results.items():
+            total = stats['success'] + stats['failed']
             rate = (stats['success'] / total * 100) if total > 0 else 0
-            print(f"  {category}:")
-            print(f"    Success: {stats['success']}/{total} ({rate:.1f}%)")
+            print(f"  {category}: Success: {stats['success']}/{total} ({rate:.1f}%)")
 
-        # Database stats
+        # Database summary
         total_predictions = PredictionLog.query.count()
-        by_timeframe = db.session.query(
-            PredictionLog.timeframe,
-            db.func.count(PredictionLog.id)
-        ).group_by(PredictionLog.timeframe).all()
+        intraday = PredictionLog.query.filter_by(timeframe='intraday').count()
+        weekly = PredictionLog.query.filter_by(timeframe='weekly').count()
+        monthly = PredictionLog.query.filter_by(timeframe='monthly').count()
 
         print(f"\n💾 Database Status:")
         print(f"  Total Predictions: {total_predictions}")
-        for timeframe, count in by_timeframe:
-            print(f"  {timeframe.upper()}: {count}")
+        print(f"  INTRADAY: {intraday}")
+        print(f"  WEEKLY: {weekly}")
+        print(f"  MONTHLY: {monthly}")
 
-        print("\n🎯 Next Steps:")
-        print("  1. Day 1: Run python scripts/validate_simple.py (intraday)")
-        print("  2. Day 7: Run python scripts/validate_simple.py (weekly)")
-        print("  3. Day 30: Run python scripts/validate_simple.py (monthly)")
-        print("  4. View accuracy: http://localhost:5173/backtesting")
-        print("\n" + "=" * 70 + "\n")
+        print(f"\n🎯 Next Steps:")
+        print(f"  1. Day 1: Run python scripts/validate_simple.py (intraday)")
+        print(f"  2. Day 7: Run python scripts/validate_simple.py (weekly)")
+        print(f"  3. Day 30: Run python scripts/validate_simple.py (monthly)")
+        print(f"  4. View accuracy: http://localhost:5173/backtesting")
 
+        print("\n" + "="*60)
 
 if __name__ == '__main__':
     main()

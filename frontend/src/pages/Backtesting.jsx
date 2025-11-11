@@ -1,323 +1,376 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, TrendingUp, Target, Award, DollarSign, RefreshCw, Calendar, CheckCircle, XCircle } from 'lucide-react';
-import { Line } from 'react-chartjs-2';
-import api from '../services/api';
+import {
+  ArrowLeft,
+  TrendingUp,
+  TrendingDown,
+  Calendar,
+  Clock,
+  Target,
+  BarChart3,
+  Filter,
+  Search
+} from 'lucide-react';
+import { stockAPI } from '../services/api';
 
 export default function Backtesting() {
-  const [stats, setStats] = useState(null);
-  const [recentPredictions, setRecentPredictions] = useState([]);
+  const [activeTab, setActiveTab] = useState('7d');
+  const [userAnalysisHistory, setUserAnalysisHistory] = useState([]);
+  const [filteredHistory, setFilteredHistory] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [validating, setValidating] = useState(false);
-  const [selectedTimeframe, setSelectedTimeframe] = useState('all');
-  const [selectedDays, setSelectedDays] = useState(30);
+  const [searchQuery, setSearchQuery] = useState('');
 
+  // Fetch user's analysis history from backend
   useEffect(() => {
-    loadData();
-  }, [selectedTimeframe, selectedDays]);
+    fetchAnalysisHistory();
+  }, [activeTab]);
 
-  const loadData = async () => {
+  const fetchAnalysisHistory = async () => {
     setLoading(true);
     try {
-      // Get stats
-      const params = new URLSearchParams();
-      if (selectedTimeframe !== 'all') params.append('timeframe', selectedTimeframe);
-      params.append('days', selectedDays);
-
-      const [statsRes, predictionsRes] = await Promise.all([
-        api.get(`/backtest/stats?${params.toString()}`),
-        api.get('/backtest/recent?limit=20')
-      ]);
-
-      setStats(statsRes.data);
-      setRecentPredictions(predictionsRes.data.predictions || []);
+      // Call API to get user's analysis history
+      const response = await stockAPI.getAnalysisHistory(activeTab);
+      setUserAnalysisHistory(response.data.history || []);
+      setFilteredHistory(response.data.history || []);
     } catch (error) {
-      console.error('Error loading backtest data:', error);
+      console.error('Failed to fetch analysis history:', error);
+      // Use mock data if API fails
+      setUserAnalysisHistory(getMockHistory());
+      setFilteredHistory(getMockHistory());
     } finally {
       setLoading(false);
     }
   };
 
-  const handleValidateNow = async () => {
-    setValidating(true);
-    try {
-      const response = await api.post('/backtest/validate');
-      alert(`Validated ${response.data.count} predictions!`);
-      loadData(); // Reload data
-    } catch (error) {
-      alert('Failed to validate predictions');
-    } finally {
-      setValidating(false);
+  // Filter history based on search query
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredHistory(userAnalysisHistory);
+    } else {
+      const filtered = userAnalysisHistory.filter(item =>
+        item.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredHistory(filtered);
     }
+  }, [searchQuery, userAnalysisHistory]);
+
+  // Mock data for demonstration
+  const getMockHistory = () => {
+    const now = new Date();
+    return [
+      {
+        id: 1,
+        symbol: 'RELIANCE',
+        name: 'Reliance Industries',
+        analyzedAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
+        currentPrice: 2456.50,
+        predictions: {
+          '1week': { target: 2520, change: 2.58, confidence: 72 },
+          '1month': { target: 2610, change: 6.25, confidence: 68 },
+          '3months': { target: 2750, change: 11.95, confidence: 65 },
+          '6months': { target: 2890, change: 17.66, confidence: 62 }
+        },
+        technical: {
+          signal: 'BUY',
+          rsi: 58.5,
+          macd: 12.3
+        }
+      },
+      {
+        id: 2,
+        symbol: 'TCS',
+        name: 'Tata Consultancy Services',
+        analyzedAt: new Date(now - 5 * 60 * 60 * 1000).toISOString(), // 5 hours ago
+        currentPrice: 3542.80,
+        predictions: {
+          '1week': { target: 3580, change: 1.05, confidence: 70 },
+          '1month': { target: 3650, change: 3.03, confidence: 67 },
+          '3months': { target: 3720, change: 5.00, confidence: 64 },
+          '6months': { target: 3800, change: 7.26, confidence: 60 }
+        },
+        technical: {
+          signal: 'HOLD',
+          rsi: 52.3,
+          macd: 5.2
+        }
+      },
+      {
+        id: 3,
+        symbol: 'INFY',
+        name: 'Infosys Limited',
+        analyzedAt: new Date(now - 1 * 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
+        currentPrice: 1456.20,
+        predictions: {
+          '1week': { target: 1440, change: -1.11, confidence: 69 },
+          '1month': { target: 1480, change: 1.63, confidence: 66 },
+          '3months': { target: 1520, change: 4.38, confidence: 63 },
+          '6months': { target: 1590, change: 9.19, confidence: 59 }
+        },
+        technical: {
+          signal: 'HOLD',
+          rsi: 48.7,
+          macd: -2.1
+        }
+      }
+    ];
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full"></div>
-      </div>
-    );
-  }
+  const tabs = [
+    { id: '7d', label: 'Last 7 Days', days: 7 },
+    { id: '30d', label: 'Last 30 Days', days: 30 },
+    { id: '90d', label: 'Last 3 Months', days: 90 },
+    { id: 'all', label: 'All Time', days: null }
+  ];
 
-  const accuracyChartData = stats?.by_timeframe ? {
-    labels: Object.keys(stats.by_timeframe),
-    datasets: [{
-      label: 'Accuracy Rate (%)',
-      data: Object.values(stats.by_timeframe).map(tf => tf.accuracy_rate),
-      borderColor: 'rgb(59, 130, 246)',
-      backgroundColor: 'rgba(59, 130, 246, 0.1)',
-      tension: 0.4,
-      fill: true,
-    }]
-  } : null;
+  const formatTimeAgo = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
 
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      title: {
-        display: true,
-        text: 'Accuracy by Timeframe',
-        color: '#fff',
-        font: { size: 16, weight: 'bold' }
-      }
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        max: 100,
-        ticks: { color: '#9ca3af' },
-        grid: { color: 'rgba(255, 255, 255, 0.1)' }
-      },
-      x: {
-        ticks: { color: '#9ca3af' },
-        grid: { color: 'rgba(255, 255, 255, 0.1)' }
-      }
+    if (diffMins < 60) return `${diffMins} minutes ago`;
+    if (diffHours < 24) return `${diffHours} hours ago`;
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 30) return `${diffDays} days ago`;
+    return date.toLocaleDateString();
+  };
+
+  const getPredictionPeriodLabel = (period) => {
+    const labels = {
+      '1week': '1 Week',
+      '1month': '1 Month',
+      '3months': '3 Months',
+      '6months': '6 Months'
+    };
+    return labels[period] || period;
+  };
+
+  const getSignalColor = (signal) => {
+    switch (signal) {
+      case 'BUY':
+        return 'text-green-400 bg-green-500/10 border-green-500/30';
+      case 'SELL':
+        return 'text-red-400 bg-red-500/10 border-red-500/30';
+      default:
+        return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30';
     }
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       {/* Header */}
-      <header className="glass border-b border-white/10 sticky top-0 z-50">
+      <header className="border-b border-white/10 backdrop-blur-md bg-black/20">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link to="/dashboard" className="flex items-center gap-2 text-gray-400 hover:text-white">
+              <Link
+                to="/dashboard"
+                className="p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition"
+              >
                 <ArrowLeft className="w-5 h-5" />
-                <span>Back</span>
               </Link>
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                  <Target className="w-5 h-5 text-purple-400" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold">AI Accuracy Tracker</h1>
-                  <p className="text-sm text-gray-400">Backtesting & Performance</p>
-                </div>
+              <div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">
+                  Analysis History
+                </h1>
+                <p className="text-sm text-gray-400">Track your stock predictions</p>
               </div>
             </div>
 
-            <button
-              onClick={handleValidateNow}
-              disabled={validating}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg transition-all disabled:opacity-50"
-            >
-              <RefreshCw className={`w-5 h-5 ${validating ? 'animate-spin' : ''}`} />
-              <span>Validate Now</span>
-            </button>
+            <div className="flex items-center gap-3">
+              <div className="px-4 py-2 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-blue-400" />
+                  <span className="text-sm font-medium text-blue-300">
+                    {filteredHistory.length} Analyses
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </header>
 
       <div className="container mx-auto px-6 py-8">
-        {/* Time Period Selector */}
-        <div className="flex gap-2 mb-6 overflow-x-auto">
-          {[7, 30, 90, 180].map(days => (
-            <button
-              key={days}
-              onClick={() => setSelectedDays(days)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
-                selectedDays === days
-                  ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
-                  : 'glass hover:bg-white/10'
-              }`}
-            >
-              Last {days} Days
-            </button>
-          ))}
+        {/* Tabs */}
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+          <div className="flex gap-2 bg-white/5 p-1 rounded-xl border border-white/10">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  activeTab === tab.id
+                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search stocks..."
+              className="pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            />
+          </div>
         </div>
 
-        {/* Stats Cards */}
-        {stats && stats.total > 0 ? (
-          <>
-            <div className="grid md:grid-cols-4 gap-6 mb-8">
-              <div className="card">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-sm text-gray-400">Total Predictions</div>
-                  <Target className="w-5 h-5 text-blue-400" />
-                </div>
-                <div className="text-3xl font-bold">{stats.total}</div>
-                <div className="text-xs text-gray-500 mt-1">Last {stats.period_days} days</div>
-              </div>
+        {/* Loading State */}
+        {loading && (
+          <div className="text-center py-12">
+            <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
+            <p className="text-gray-400">Loading analysis history...</p>
+          </div>
+        )}
 
-              <div className="card">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-sm text-gray-400">Accuracy Rate</div>
-                  <Award className="w-5 h-5 text-green-400" />
-                </div>
-                <div className="text-3xl font-bold text-green-400">{stats.accuracy_rate}%</div>
-                <div className="text-xs text-gray-500 mt-1">
-                  {stats.accurate} of {stats.total} accurate
-                </div>
-              </div>
-
-              <div className="card">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-sm text-gray-400">Win Rate</div>
-                  <TrendingUp className="w-5 h-5 text-purple-400" />
-                </div>
-                <div className="text-3xl font-bold text-purple-400">{stats.win_rate}%</div>
-                <div className="text-xs text-gray-500 mt-1">
-                  {stats.winning_trades} winning trades
-                </div>
-              </div>
-
-              <div className="card">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-sm text-gray-400">Total Return</div>
-                  <DollarSign className="w-5 h-5 text-yellow-400" />
-                </div>
-                <div className={`text-3xl font-bold ${stats.total_profit_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {stats.total_profit_pct >= 0 ? '+' : ''}{stats.total_profit_pct}%
-                </div>
-                <div className="text-xs text-gray-500 mt-1">If followed all signals</div>
-              </div>
+        {/* Empty State */}
+        {!loading && filteredHistory.length === 0 && (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Target className="w-8 h-8 text-blue-400" />
             </div>
-
-            {/* Accuracy Chart */}
-            {accuracyChartData && (
-              <div className="card mb-8">
-                <h3 className="text-xl font-bold mb-4">Performance by Timeframe</h3>
-                <div className="h-80">
-                  <Line data={accuracyChartData} options={chartOptions} />
-                </div>
-              </div>
-            )}
-
-            {/* Timeframe Breakdown */}
-            <div className="card mb-8">
-              <h3 className="text-xl font-bold mb-4">Detailed Breakdown</h3>
-              <div className="grid md:grid-cols-4 gap-4">
-                {Object.entries(stats.by_timeframe || {}).map(([timeframe, data]) => (
-                  <div key={timeframe} className="glass p-4 rounded-lg">
-                    <div className="text-sm text-gray-400 uppercase mb-2">{timeframe}</div>
-                    <div className="text-2xl font-bold text-blue-400 mb-1">
-                      {data.accuracy_rate.toFixed(1)}%
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {data.accurate}/{data.total} accurate
-                    </div>
-                    <div className="mt-2 h-1 bg-white/10 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-blue-500 to-purple-500"
-                        style={{ width: `${data.accuracy_rate}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Recent Predictions */}
-            <div className="card">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold">Recent Validated Predictions</h3>
-                <span className="text-sm text-gray-400">{recentPredictions.length} predictions</span>
-              </div>
-
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {recentPredictions.map((pred) => (
-                  <div
-                    key={pred.id}
-                    className={`p-4 glass rounded-lg border ${
-                      pred.is_accurate 
-                        ? 'border-green-500/30 bg-green-500/10' 
-                        : 'border-red-500/30 bg-red-500/10'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className="text-lg font-bold">{pred.symbol}</span>
-                          <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded">
-                            {pred.timeframe}
-                          </span>
-                          {pred.is_accurate ? (
-                            <CheckCircle className="w-5 h-5 text-green-400" />
-                          ) : (
-                            <XCircle className="w-5 h-5 text-red-400" />
-                          )}
-                          <span className={`text-sm font-semibold ${pred.is_accurate ? 'text-green-400' : 'text-red-400'}`}>
-                            {pred.accuracy_pct.toFixed(1)}% accurate
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-4 text-sm">
-                          <div>
-                            <div className="text-gray-400">Predicted</div>
-                            <div className="font-semibold">₹{pred.predicted_price.toFixed(2)}</div>
-                            <div className="text-xs text-gray-500">
-                              {pred.predicted_change_pct >= 0 ? '+' : ''}{pred.predicted_change_pct.toFixed(2)}%
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="text-gray-400">Actual</div>
-                            <div className="font-semibold">₹{pred.actual_price.toFixed(2)}</div>
-                            <div className={`text-xs ${pred.actual_change_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              {pred.actual_change_pct >= 0 ? '+' : ''}{pred.actual_change_pct.toFixed(2)}%
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="text-gray-400">Confidence</div>
-                            <div className="font-semibold">{pred.confidence}%</div>
-                            <div className="text-xs text-gray-500">
-                              {new Date(pred.prediction_date).toLocaleDateString()}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {pred.profit_if_followed !== null && (
-                        <div className="text-right ml-4">
-                          <div className="text-xs text-gray-400">If Followed</div>
-                          <div className={`text-xl font-bold ${pred.profit_if_followed >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {pred.profit_if_followed >= 0 ? '+' : ''}{pred.profit_if_followed.toFixed(2)}%
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="card text-center py-16">
-            <Target className="w-16 h-16 mx-auto mb-4 text-gray-600 opacity-50" />
-            <h3 className="text-xl font-bold mb-2">No Predictions Validated Yet</h3>
+            <h3 className="text-xl font-bold mb-2">No Analysis History</h3>
             <p className="text-gray-400 mb-6">
-              Start analyzing stocks to build prediction history.<br/>
-              Predictions will be automatically validated after their target dates.
+              {searchQuery
+                ? `No results found for "${searchQuery}"`
+                : 'Start analyzing stocks to see your prediction history'}
             </p>
-            <Link to="/dashboard" className="btn-primary inline-block">
+            <Link
+              to="/dashboard"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-500 hover:bg-blue-600 rounded-lg font-medium transition"
+            >
+              <Search className="w-5 h-5" />
               Analyze Stocks
             </Link>
           </div>
         )}
+
+        {/* Analysis History Cards */}
+        {!loading && filteredHistory.length > 0 && (
+          <div className="space-y-4">
+            {filteredHistory.map((analysis) => (
+              <div
+                key={analysis.id}
+                className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-6 hover:border-white/20 transition-all"
+              >
+                {/* Stock Header */}
+                <div className="flex items-start justify-between mb-6">
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-2xl font-bold">{analysis.symbol}</h3>
+                      <span
+                        className={`px-3 py-1 rounded-lg text-xs font-medium border ${getSignalColor(
+                          analysis.technical.signal
+                        )}`}
+                      >
+                        {analysis.technical.signal}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-400">{analysis.name}</p>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="text-2xl font-bold">
+                      ₹{analysis.currentPrice.toLocaleString('en-IN')}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
+                      <Clock className="w-3 h-3" />
+                      {formatTimeAgo(analysis.analyzedAt)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Predictions Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  {Object.entries(analysis.predictions).map(([period, pred]) => (
+                    <div
+                      key={period}
+                      className="bg-white/5 rounded-xl p-4 border border-white/10"
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <Calendar className="w-4 h-4 text-blue-400" />
+                        <span className="text-xs text-gray-400 uppercase">
+                          {getPredictionPeriodLabel(period)}
+                        </span>
+                      </div>
+                      <div className="text-xl font-bold mb-1">₹{pred.target}</div>
+                      <div
+                        className={`flex items-center gap-1 text-sm font-semibold ${
+                          pred.change >= 0 ? 'text-green-400' : 'text-red-400'
+                        }`}
+                      >
+                        {pred.change >= 0 ? (
+                          <TrendingUp className="w-4 h-4" />
+                        ) : (
+                          <TrendingDown className="w-4 h-4" />
+                        )}
+                        {pred.change >= 0 ? '+' : ''}
+                        {pred.change}%
+                      </div>
+                      <div className="text-xs text-gray-500 mt-2">
+                        Confidence: {pred.confidence}%
+                      </div>
+                      <div className="mt-2 h-1 bg-white/10 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-blue-500 to-purple-500"
+                          style={{ width: `${pred.confidence}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Technical Indicators */}
+                <div className="flex items-center gap-4 pt-4 border-t border-white/10">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-gray-400">RSI:</span>
+                    <span className="font-semibold">{analysis.technical.rsi}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-gray-400">MACD:</span>
+                    <span className="font-semibold">{analysis.technical.macd}</span>
+                  </div>
+                  <div className="ml-auto">
+                    <Link
+                      to="/dashboard"
+                      className="text-sm text-blue-400 hover:text-blue-300 font-medium"
+                    >
+                      Analyze Again →
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Info Box */}
+        <div className="mt-8 bg-blue-500/5 backdrop-blur-xl rounded-2xl border border-blue-500/20 p-6">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+              <BarChart3 className="w-5 h-5 text-blue-400" />
+            </div>
+            <div>
+              <h4 className="font-semibold mb-2">About Analysis History</h4>
+              <p className="text-sm text-gray-400 leading-relaxed">
+                Your analysis history shows all stocks you've analyzed with their AI-powered
+                predictions. Each entry includes price targets for different time periods and
+                technical indicators. Use this to track your prediction accuracy over time.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -7,7 +7,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: false, // Important for CORS
+  withCredentials: false,
 });
 
 // Request interceptor - Add token to every request
@@ -24,15 +24,13 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor - Handle errors but DON'T auto-logout on every error
+// Response interceptor - Handle errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Only logout on 401 (Unauthorized) for auth endpoints
     if (error.response?.status === 401 && error.config.url.includes('/auth/me')) {
       console.log('Token expired, clearing auth');
       localStorage.removeItem('token');
-      // Only redirect if not already on login page
       if (!window.location.pathname.includes('/login')) {
         window.location.href = '/login';
       }
@@ -48,9 +46,18 @@ export const authAPI = {
 };
 
 export const stockAPI = {
-  search: (query, exchange = 'NSE') => api.get(`/stocks/search?q=${query}&exchange=${exchange}`),
-  analyze: (symbol, exchange = 'NSE') => api.post('/analyze', { symbol, exchange }),
-  getList: (exchange) => api.get(`/stocks/list/${exchange}`),
+  search: (query, exchange = 'NSE') =>
+    api.get(`/stocks/search?q=${query}&exchange=${exchange}`),
+  analyze: (symbol, exchange = 'NSE') =>
+    api.post('/analyze', { symbol, exchange }),
+  getList: (exchange) =>
+    api.get(`/stocks/list/${exchange}`),
+
+  // NEW: Analysis history endpoints
+  getAnalysisHistory: (period = '7d') =>
+    api.get(`/analysis-history?period=${period}`),
+  saveAnalysis: (analysisData) =>
+    api.post('/save-analysis', analysisData),
 };
 
 export const watchlistAPI = {

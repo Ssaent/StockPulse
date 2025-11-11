@@ -1,459 +1,432 @@
-// frontend/src/components/Alerts.jsx
-import React, { useEffect, useState } from 'react';
-import { Bell, Plus, X, TrendingUp, TrendingDown, Trash2, AlertTriangle } from 'lucide-react';
-
-/* ---------------- RGV Shell (neon-noir, NO RAIN) ---------------- */
-
-function RgvPanel({ children, className = '' }) {
-  return (
-    <div
-      className={[
-        'relative overflow-hidden rounded-2xl p-6',
-        'border border-white/10',
-        'shadow-[0_24px_70px_rgba(0,0,0,0.6),inset_0_0_0_1px_rgba(255,255,255,0.05)]',
-        className,
-      ].join(' ')}
-      style={{
-        background:
-          'radial-gradient(140% 120% at 50% 70%, #0a0c0d 0%, #020303 55%, #000 100%)',
-      }}
-    >
-      {/* neon ghosts */}
-      <div className="pointer-events-none absolute inset-0 mix-blend-screen opacity-30">
-        <div
-          className="absolute -inset-1 blur-2xl"
-          style={{
-            background:
-              'radial-gradient(60% 60% at 65% 45%, rgba(225,29,72,0.38) 0%, transparent 70%)',
-          }}
-        />
-        <div
-          className="absolute -inset-1 blur-2xl"
-          style={{
-            background:
-              'radial-gradient(60% 60% at 35% 70%, rgba(34,197,94,0.28) 0%, transparent 70%)',
-          }}
-        />
-      </div>
-
-      {/* scanlines */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-20 mix-blend-overlay"
-        style={{
-          backgroundImage:
-            'repeating-linear-gradient(to bottom, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 1px, transparent 2px, transparent 3px)',
-        }}
-      />
-      {/* grain */}
-      <div className="pointer-events-none absolute inset-0 opacity-50 mix-blend-soft-light rgv-grain" />
-      {/* vignette */}
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(circle at 50% 60%, rgba(0,0,0,0) 45%, rgba(0,0,0,0.85) 100%)',
-        }}
-      />
-
-      <div className="relative z-10">{children}</div>
-
-      <style>{`
-        .rgv-grain {
-          background-image: url("data:image/svg+xml;utf8,\
-<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'>\
-<filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/></filter>\
-<rect width='100%' height='100%' filter='url(%23n)' opacity='0.06'/></svg>");
-          background-size: 180px 180px;
-          animation: rgvGrain 9s linear infinite;
-        }
-        @keyframes rgvGrain { 0% { transform: translate(0,0) } 100% { transform: translate(-80px,-60px) } }
-      `}</style>
-    </div>
-  );
-}
-
-function NeonPill({ active }) {
-  return (
-    <span
-      className={[
-        'px-2 py-1 rounded text-[10px] font-semibold tracking-wide border',
-        active
-          ? 'bg-green-500/15 text-green-300 border-green-500/30'
-          : 'bg-gray-500/10 text-gray-300 border-gray-500/30',
-      ].join(' ')}
-    >
-      {active ? 'ACTIVE' : 'INACTIVE'}
-    </span>
-  );
-}
-
-function NeonToggle({ checked, onChange }) {
-  return (
-    <label className="relative inline-flex items-center cursor-pointer select-none">
-      <input
-        type="checkbox"
-        className="sr-only peer"
-        checked={checked}
-        onChange={onChange}
-      />
-      <span className="w-12 h-7 rounded-full transition-colors duration-300 bg-white/10 peer-checked:bg-green-500/40 border border-white/10 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]" />
-      <span className="absolute top-[3px] left-[3px] w-6 h-6 rounded-full bg-white shadow-md transition-all duration-300 peer-checked:translate-x-5" />
-    </label>
-  );
-}
-
-function Modal({ open, onClose, title, children }) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 p-4 flex items-center justify-center">
-      <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-[2px]"
-        onClick={onClose}
-      />
-      <div className="relative z-10 w-full max-w-md">
-        <RgvPanel className="p-0">
-          <div className="flex items-center justify-between px-6 py-5 border-b border-white/10">
-            <h2 className="text-lg font-bold">{title}</h2>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10"
-            >
-              <X size={18} />
-            </button>
-          </div>
-          <div className="px-6 py-5">{children}</div>
-        </RgvPanel>
-      </div>
-    </div>
-  );
-}
-
-/* ---------------- Main: Alerts (same API logic) ---------------- */
+import React, { useState, useEffect } from 'react';
+import { Bell, Plus, Trash2, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
+import { alertsAPI, stockAPI } from '../services/api';
 
 export default function Alerts() {
   const [alerts, setAlerts] = useState([]);
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [formData, setFormData] = useState({
-    symbol: '',
-    exchange: 'NSE',
-    alertType: 'price',
-    condition: 'above',
-    threshold: '',
-  });
+
+  // Form states
+  const [symbol, setSymbol] = useState('');
+  const [exchange, setExchange] = useState('NSE');
+  const [condition, setCondition] = useState('above');
+  const [threshold, setThreshold] = useState('');
+
+  // Stock search states
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [stockName, setStockName] = useState('');
 
   useEffect(() => {
     fetchAlerts();
   }, []);
 
+  // Search stocks as user types
+  useEffect(() => {
+    const searchStocks = async () => {
+      if (symbol.length < 2) {
+        setSearchResults([]);
+        setShowSuggestions(false);
+        return;
+      }
+
+      setSearching(true);
+      try {
+        const res = await stockAPI.search(symbol, exchange);
+        setSearchResults(res.data.results || []);
+        setShowSuggestions(true);
+      } catch (error) {
+        console.error('Search error:', error);
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
+    };
+
+    const timer = setTimeout(searchStocks, 300);
+    return () => clearTimeout(timer);
+  }, [symbol, exchange]);
+
   const fetchAlerts = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/alerts', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      setAlerts(data.alerts || []);
-      setLoading(false);
+      setLoading(true);
+      const res = await alertsAPI.getAll();
+      setAlerts(res.data.alerts || []);
     } catch (error) {
       console.error('Error fetching alerts:', error);
+    } finally {
       setLoading(false);
     }
+  };
+
+  const handleStockSelect = (stock) => {
+    setSymbol(stock.symbol);
+    setStockName(stock.name);
+    setShowSuggestions(false);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.symbol || !formData.threshold) {
-      alert('Please fill in all fields');
+
+    // Validation
+    if (!symbol.trim()) {
+      alert('Please enter a stock symbol');
       return;
     }
+
+    if (!threshold || isNaN(threshold) || Number(threshold) <= 0) {
+      alert('Please enter a valid target price');
+      return;
+    }
+
+    // Verify stock exists
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/alerts', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          symbol: formData.symbol.toUpperCase(),
-          exchange: formData.exchange,
-          alert_type: formData.alertType,
-          condition: formData.condition,
-          threshold: parseFloat(formData.threshold),
-        }),
-      });
-      if (response.ok) {
-        setFormData({
-          symbol: '',
-          exchange: 'NSE',
-          alertType: 'price',
-          condition: 'above',
-          threshold: '',
-        });
-        setShowCreateForm(false);
-        fetchAlerts();
-      } else {
-        alert('Failed to create alert');
+      const res = await stockAPI.search(symbol, exchange);
+      const stockExists = res.data.results?.some(
+        (s) => s.symbol.toUpperCase() === symbol.toUpperCase()
+      );
+
+      if (!stockExists) {
+        alert(`Stock "${symbol}" not found in ${exchange}. Please select from suggestions.`);
+        return;
       }
     } catch (error) {
-      console.error('Error creating alert:', error);
-      alert('Failed to create alert');
+      alert('Error validating stock. Please try again.');
+      return;
     }
-  };
 
-  const toggleAlert = async (id, currentStatus) => {
     try {
-      const token = localStorage.getItem('token');
-      await fetch(`http://localhost:5000/api/alerts/${id}`, {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ is_active: !currentStatus }),
+      await alertsAPI.create({
+        symbol: symbol.toUpperCase(),
+        exchange,
+        alert_type: 'price',
+        condition,
+        threshold: Number(threshold),
       });
+
+      alert('Alert created successfully!');
+      setShowForm(false);
+      resetForm();
       fetchAlerts();
     } catch (error) {
-      console.error('Error toggling alert:', error);
+      console.error('Error creating alert:', error);
+      alert(error.response?.data?.error || 'Failed to create alert');
     }
   };
 
-  const deleteAlert = async (id) => {
-    if (!confirm('Delete this alert?')) return;
+  const resetForm = () => {
+    setSymbol('');
+    setStockName('');
+    setExchange('NSE');
+    setCondition('above');
+    setThreshold('');
+    setSearchResults([]);
+    setShowSuggestions(false);
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this alert?')) return;
+
     try {
-      const token = localStorage.getItem('token');
-      await fetch(`http://localhost:5000/api/alerts/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      fetchAlerts();
+      await alertsAPI.delete(id);
+      setAlerts(alerts.filter((a) => a.id !== id));
+      alert('Alert deleted successfully!');
     } catch (error) {
       console.error('Error deleting alert:', error);
+      alert('Failed to delete alert');
     }
   };
-
-  /* ---------------- Render ---------------- */
 
   if (loading) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="w-12 h-12 border-4 rounded-full border-white/10 border-t-fuchsia-400 animate-spin" />
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
+          <p className="text-gray-400">Loading alerts...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <RgvPanel>
+    <div className="min-h-screen p-6">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-12 h-12 rounded-xl border flex items-center justify-center"
-              style={{
-                background:
-                  'linear-gradient(135deg, rgba(59,130,246,0.18), rgba(255,255,255,0.04))',
-                borderColor: 'rgba(59,130,246,0.35)',
-                boxShadow: '0 10px 28px rgba(59,130,246,0.22)',
-              }}
-            >
-              <Bell className="w-6 h-6 text-blue-300" />
-            </div>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-extrabold">Price Alerts</h1>
-              <p className="text-xs text-gray-400">Get notified the second it happens.</p>
-            </div>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-3">
+              <Bell className="w-8 h-8 text-blue-400" />
+              Price Alerts
+            </h1>
+            <p className="text-gray-400 mt-2">Get notified when stocks hit your target price</p>
           </div>
-
           <button
-            onClick={() => setShowCreateForm(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 border border-white/15 transition"
+            onClick={() => setShowForm(!showForm)}
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg font-semibold hover:shadow-lg transition"
           >
-            <Plus size={18} />
+            <Plus className="w-5 h-5" />
             Create Alert
           </button>
         </div>
 
-        {/* Empty state / List */}
+        {/* Create Alert Form */}
+        {showForm && (
+          <div className="glass rounded-2xl p-6 mb-8 border border-white/10">
+            <h3 className="text-xl font-bold mb-6">Create New Alert</h3>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* Stock Symbol with Search */}
+                <div className="relative">
+                  <label className="block text-sm font-medium mb-2 text-gray-300">
+                    Stock Symbol / Name
+                  </label>
+                  <input
+                    type="text"
+                    value={symbol}
+                    onChange={(e) => {
+                      setSymbol(e.target.value.toUpperCase());
+                      setStockName('');
+                    }}
+                    onFocus={() => symbol.length >= 2 && setShowSuggestions(true)}
+                    placeholder="Search stock (e.g., RELIANCE, TCS)"
+                    className="input"
+                    required
+                  />
+                  {stockName && (
+                    <p className="text-xs text-green-400 mt-1">✓ {stockName}</p>
+                  )}
+
+                  {/* Search Suggestions Dropdown */}
+                  {showSuggestions && searchResults.length > 0 && (
+                    <div className="absolute z-50 mt-2 w-full bg-slate-900 border border-white/20 rounded-lg shadow-2xl max-h-60 overflow-auto">
+                      {searchResults.map((stock) => (
+                        <button
+                          key={stock.symbol}
+                          type="button"
+                          onClick={() => handleStockSelect(stock)}
+                          className="w-full text-left px-4 py-3 hover:bg-white/10 border-b border-white/10 transition"
+                        >
+                          <div className="font-bold text-white">{stock.symbol}</div>
+                          <div className="text-xs text-gray-400">{stock.name}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {searching && (
+                    <p className="text-xs text-gray-400 mt-1">Searching...</p>
+                  )}
+
+                  {symbol.length >= 2 && !searching && searchResults.length === 0 && (
+                    <p className="text-xs text-red-400 mt-1">No stocks found</p>
+                  )}
+                </div>
+
+                {/* Exchange */}
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-300">
+                    Exchange
+                  </label>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setExchange('NSE')}
+                      className={`flex-1 px-4 py-3 rounded-lg border-2 transition font-medium ${
+                        exchange === 'NSE'
+                          ? 'bg-blue-500/20 border-blue-500 text-blue-300'
+                          : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/30'
+                      }`}
+                      title="National Stock Exchange"
+                    >
+                      NSE
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setExchange('BSE')}
+                      className={`flex-1 px-4 py-3 rounded-lg border-2 transition font-medium ${
+                        exchange === 'BSE'
+                          ? 'bg-purple-500/20 border-purple-500 text-purple-300'
+                          : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/30'
+                      }`}
+                      title="Bombay Stock Exchange"
+                    >
+                      BSE
+                    </button>
+                  </div>
+                </div>
+
+                {/* Condition - Full Width */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-2 text-gray-300">
+                    Alert When Price Goes
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setCondition('above')}
+                      className={`px-6 py-4 rounded-lg border-2 transition font-semibold flex items-center justify-center gap-2 ${
+                        condition === 'above'
+                          ? 'bg-green-500/30 border-green-400 text-green-200 shadow-lg shadow-green-500/20'
+                          : 'bg-white/5 border-white/20 text-gray-300 hover:border-green-400/50 hover:text-green-300'
+                      }`}
+                    >
+                      <TrendingUp className="w-5 h-5" />
+                      Above Target
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCondition('below')}
+                      className={`px-6 py-4 rounded-lg border-2 transition font-semibold flex items-center justify-center gap-2 ${
+                        condition === 'below'
+                          ? 'bg-red-500/30 border-red-400 text-red-200 shadow-lg shadow-red-500/20'
+                          : 'bg-white/5 border-white/20 text-gray-300 hover:border-red-400/50 hover:text-red-300'
+                      }`}
+                    >
+                      <TrendingDown className="w-5 h-5" />
+                      Below Target
+                    </button>
+                  </div>
+                </div>
+
+                {/* Target Price - No Arrows */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-2 text-gray-300">
+                    Target Price (₹)
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={threshold}
+                    onChange={(e) => {
+                      // Only allow numbers and decimal point
+                      const value = e.target.value.replace(/[^0-9.]/g, '');
+                      // Prevent multiple decimal points
+                      const parts = value.split('.');
+                      if (parts.length > 2) return;
+                      setThreshold(value);
+                    }}
+                    placeholder="e.g., 1500.50"
+                    className="input text-2xl font-bold"
+                    required
+                  />
+                  <p className="text-xs text-gray-400 mt-2">
+                    You'll be notified when {symbol || 'the stock'} reaches this price
+                  </p>
+                </div>
+              </div>
+
+              {/* Form Actions */}
+              <div className="flex gap-4">
+                <button
+                  type="submit"
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg font-semibold hover:shadow-lg transition"
+                >
+                  Create Alert
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForm(false);
+                    resetForm();
+                  }}
+                  className="flex-1 px-6 py-3 bg-white/5 hover:bg-white/10 rounded-lg font-semibold border border-white/10 transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Alerts List */}
         {alerts.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-center">
-              <AlertTriangle className="w-8 h-8 text-gray-400" />
-            </div>
-            <h3 className="text-lg font-semibold mb-2">No alerts yet</h3>
-            <p className="text-gray-400 mb-6">Create your first rule to watch a price/indicator.</p>
+          <div className="glass rounded-2xl p-12 text-center border border-white/10">
+            <AlertCircle className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+            <h3 className="text-xl font-bold mb-2">No alerts yet</h3>
+            <p className="text-gray-400 mb-6">Create your first alert to get notified about stock movements</p>
             <button
-              onClick={() => setShowCreateForm(true)}
-              className="px-4 py-2 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 text-blue-300"
+              onClick={() => setShowForm(true)}
+              className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg font-semibold hover:shadow-lg transition"
             >
-              Create your first alert
+              Create Your First Alert
             </button>
           </div>
         ) : (
           <div className="grid gap-4">
-            {alerts.map((alert) => {
-              const up = alert.condition === 'above';
-              return (
-                <div
-                  key={alert.id}
-                  className={[
-                    'rounded-xl p-4 border transition-all',
-                    'bg-white/5 border-white/10',
-                    'hover:scale-[1.01] hover:shadow-[0_16px_44px_rgba(0,0,0,0.38)]',
-                  ].join(' ')}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    {/* Left block */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-2 flex-wrap">
-                        <h3 className="text-lg font-bold">{alert.symbol}</h3>
-                        <span className="text-xs text-gray-400">{alert.exchange}</span>
-                        <NeonPill active={alert.is_active} />
-                      </div>
+            {alerts.map((alert) => (
+              <div
+                key={alert.id}
+                className="glass rounded-xl p-6 border border-white/10 hover:border-white/20 transition"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    {/* Icon based on condition */}
+                    <div
+                      className={`p-3 rounded-lg ${
+                        alert.condition === 'above'
+                          ? 'bg-green-500/20 text-green-400'
+                          : 'bg-red-500/20 text-red-400'
+                      }`}
+                    >
+                      {alert.condition === 'above' ? (
+                        <TrendingUp className="w-6 h-6" />
+                      ) : (
+                        <TrendingDown className="w-6 h-6" />
+                      )}
+                    </div>
 
-                      <div className="flex items-center gap-2 text-sm text-gray-300 flex-wrap">
-                        {up ? (
-                          <TrendingUp className="w-4 h-4 text-green-300" />
-                        ) : (
-                          <TrendingDown className="w-4 h-4 text-red-300" />
-                        )}
-                        <span className="capitalize">{alert.alert_type}</span>
-                        <span>•</span>
-                        <span className="capitalize">{alert.condition}</span>
-                        <span>•</span>
-                        <span className="font-semibold">
-                          {alert.alert_type === 'price' && '₹'}
-                          {alert.threshold}
+                    {/* Alert Details */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="text-xl font-bold">{alert.symbol}</h3>
+                        <span className="px-2 py-1 bg-blue-500/20 text-blue-300 text-xs rounded">
+                          {alert.exchange}
+                        </span>
+                        <span
+                          className={`px-2 py-1 text-xs rounded ${
+                            alert.status === 'active'
+                              ? 'bg-green-500/20 text-green-300'
+                              : 'bg-gray-500/20 text-gray-300'
+                          }`}
+                        >
+                          {alert.status}
                         </span>
                       </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-3 shrink-0">
-                      <NeonToggle
-                        checked={alert.is_active}
-                        onChange={() => toggleAlert(alert.id, alert.is_active)}
-                      />
-                      <button
-                        onClick={() => deleteAlert(alert.id)}
-                        className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-300 transition"
-                        title="Delete"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      <p className="text-gray-400">
+                        Alert when price goes{' '}
+                        <span className={`font-semibold ${
+                          alert.condition === 'above' ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {alert.condition}
+                        </span>{' '}
+                        <span className="font-bold text-white text-lg">
+                          ₹{Number(alert.threshold).toLocaleString('en-IN')}
+                        </span>
+                      </p>
+                      {alert.triggered_at && (
+                        <p className="text-xs text-yellow-400 mt-1">
+                          Triggered: {new Date(alert.triggered_at).toLocaleString()}
+                        </p>
+                      )}
                     </div>
                   </div>
+
+                  {/* Delete Button */}
+                  <button
+                    onClick={() => handleDelete(alert.id)}
+                    className="p-3 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition"
+                    title="Delete Alert"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
-      </RgvPanel>
-
-      {/* Create Form Modal */}
-      <Modal
-        open={showCreateForm}
-        onClose={() => setShowCreateForm(false)}
-        title="Create New Alert"
-      >
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          {/* Symbol */}
-          <div>
-            <label className="block text-xs font-semibold tracking-wide text-gray-300 mb-1">
-              Stock Symbol
-            </label>
-            <input
-              type="text"
-              value={formData.symbol}
-              onChange={(e) =>
-                setFormData({ ...formData, symbol: e.target.value.toUpperCase() })
-              }
-              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 focus:outline-none focus:ring-2 focus:ring-blue-400"
-              placeholder="RELIANCE"
-            />
-          </div>
-
-          {/* Exchange */}
-          <div>
-            <label className="block text-xs font-semibold tracking-wide text-gray-300 mb-1">
-              Exchange
-            </label>
-            <select
-              value={formData.exchange}
-              onChange={(e) => setFormData({ ...formData, exchange: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            >
-              <option value="NSE">NSE</option>
-              <option value="BSE">BSE</option>
-            </select>
-          </div>
-
-          {/* Alert Type */}
-          <div>
-            <label className="block text-xs font-semibold tracking-wide text-gray-300 mb-1">
-              Alert Type
-            </label>
-            <select
-              value={formData.alertType}
-              onChange={(e) => setFormData({ ...formData, alertType: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            >
-              <option value="price">Price</option>
-              <option value="rsi">RSI</option>
-              <option value="macd">MACD</option>
-            </select>
-          </div>
-
-          {/* Condition */}
-          <div>
-            <label className="block text-xs font-semibold tracking-wide text-gray-300 mb-1">
-              Condition
-            </label>
-            <select
-              value={formData.condition}
-              onChange={(e) => setFormData({ ...formData, condition: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            >
-              <option value="above">Above</option>
-              <option value="below">Below</option>
-              <option value="equals">Equals</option>
-            </select>
-          </div>
-
-          {/* Threshold */}
-          <div>
-            <label className="block text-xs font-semibold tracking-wide text-gray-300 mb-1">
-              Threshold {formData.alertType === 'price' && '(₹)'}
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              value={formData.threshold}
-              onChange={(e) => setFormData({ ...formData, threshold: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 focus:outline-none focus:ring-2 focus:ring-blue-400"
-              placeholder="2500.00"
-            />
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-2 pt-2">
-            <button
-              type="submit"
-              className="flex-1 py-2 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 text-blue-300 transition"
-            >
-              Create Alert
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowCreateForm(false)}
-              className="flex-1 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      </Modal>
+      </div>
     </div>
   );
 }

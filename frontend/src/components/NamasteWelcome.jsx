@@ -138,11 +138,18 @@ const RgvNamaste = ({ onComplete }) => {
 
   const containerStyle = {
     position: 'fixed',
-    inset: 0,
-    zIndex: 9999,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100vw',
+    height: '100vh',
+    zIndex: 999999, // SUPER HIGH - Above everything
     background:
       'radial-gradient(120% 120% at 50% 70%, #0a0c0d 0%, #020303 60%, #000000 100%)',
     overflow: 'hidden',
+    margin: 0,
+    padding: 0,
   };
 
   const stageStyle = {
@@ -263,23 +270,40 @@ const RgvNamaste = ({ onComplete }) => {
         /* Fonts */
         @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');
 
-        /* Camera rigs */
-        .rgv-cam { width: 100%; height: 100%; transform: rotate(-1.4deg) scale(1.01); transform-origin: 50% 60%; }
+        /* CRITICAL: Ensure camera container covers EVERYTHING */
+        .rgv-cam {
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 0 !important;
+          width: 100vw !important;
+          height: 100vh !important;
+          min-height: 100vh !important;
+          transform: rotate(-1.4deg) scale(1.08);
+          transform-origin: 50% 60%;
+          z-index: 999999 !important;
+        }
         .rgv-cam-shake-soft { animation: camSoft 1800ms ease-in-out infinite; }
         .rgv-cam-shake-strong { animation: camHard 320ms steps(2,end) infinite; }
 
         @keyframes camSoft {
-          0%,100% { transform: rotate(-1.4deg) translate(0,0) scale(1.01); }
-          50%     { transform: rotate(-2.1deg) translate(-2px,1px) scale(1.008); }
+          0%,100% { transform: rotate(-1.4deg) translate(0,0) scale(1.08); }
+          50%     { transform: rotate(-2.1deg) translate(-2px,1px) scale(1.08); }
         }
         @keyframes camHard {
-          0%   { transform: rotate(-1.8deg) translate(-2px,1px) scale(1.012); }
-          50%  { transform: rotate(-0.8deg) translate(2px,-1px) scale(1.012); }
-          100% { transform: rotate(-1.8deg) translate(-2px,1px) scale(1.012); }
+          0%   { transform: rotate(-1.8deg) translate(-2px,1px) scale(1.08); }
+          50%  { transform: rotate(-0.8deg) translate(2px,-1px) scale(1.08); }
+          100% { transform: rotate(-1.8deg) translate(-2px,1px) scale(1.08); }
         }
 
         /* Rain */
-        .rgv-rain { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+        .rgv-rain {
+          position: absolute;
+          inset: -10% !important;
+          pointer-events: none;
+          overflow: hidden;
+        }
         .rgv-rain-drop {
           position: absolute;
           top: -30px;
@@ -297,7 +321,8 @@ const RgvNamaste = ({ onComplete }) => {
 
         /* Neon ghosts */
         .rgv-neon {
-          position: absolute; inset: -20%;
+          position: absolute;
+          inset: -30% !important;
           filter: blur(32px);
           mix-blend-mode: screen;
         }
@@ -310,7 +335,9 @@ const RgvNamaste = ({ onComplete }) => {
 
         /* Scanlines / grain / vignette / pollution */
         .rgv-scanlines {
-          position: absolute; inset: 0; pointer-events:none;
+          position: absolute;
+          inset: 0;
+          pointer-events:none;
           background-image: repeating-linear-gradient(
             to bottom,
             rgba(255,255,255,0.03) 0px,
@@ -322,12 +349,10 @@ const RgvNamaste = ({ onComplete }) => {
           opacity: 0.25;
         }
         .rgv-grain {
-          position: absolute; inset: 0; pointer-events: none;
-          background-image: url("data:image/svg+xml;utf8,\
-<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'>\
-<filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/></filter>\
-<rect width='100%' height='100%' filter='url(%23n)' opacity='0.05'/>\
-</svg>");
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.05'/></svg>");
           background-size: 180px 180px;
           animation: grainMove 9s linear infinite;
           opacity: 0.55;
@@ -338,12 +363,15 @@ const RgvNamaste = ({ onComplete }) => {
           100% { transform: translate(-80px,-60px) }
         }
         .rgv-vignette {
-          position: absolute; inset: 0; pointer-events: none;
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
           background: radial-gradient(circle at 50% 60%, rgba(0,0,0,0) 45%, rgba(0,0,0,0.85) 100%);
           transition: opacity 600ms ease-out;
         }
         .rgv-pollution {
-          position: absolute; inset: -25%;
+          position: absolute;
+          inset: -25%;
           background: radial-gradient(120% 80% at 50% 100%, rgba(255,0,80,0.15) 0%, rgba(0,0,0,0) 60%);
           filter: blur(28px);
           mix-blend-mode: screen;
@@ -405,8 +433,14 @@ const RgvNamaste = ({ onComplete }) => {
           50% { transform: translate(0.6px,-0.6px); }
         }
 
-        /* Disable scroll */
-        body { overflow: hidden !important; }
+        /* Disable scroll and prevent any background bleed */
+        body {
+          overflow: hidden !important;
+        }
+
+        html, body {
+          position: relative;
+        }
       `}</style>
     </div>
   );
