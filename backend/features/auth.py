@@ -1,33 +1,92 @@
 """
-Authentication routes
+Authentication routes with OTP-based email verification (Industry Standard)
 """
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, request, jsonify
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_bcrypt import Bcrypt
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta, timezone
+import re
+import secrets
 
-# FLEXIBLE IMPORTS - works from both root and backend directory
 try:
     from backend.database.models import db, User
+    from backend.services.email_service import email_service
 except ImportError:
     from database.models import db, User
+    from services.email_service import email_service
 
 auth_bp = Blueprint('auth', __name__)
 jwt = JWTManager()
 bcrypt = Bcrypt()
 
 
+def generate_otp():
+    """Generate 6-digit OTP"""
+    return ''.join([str(secrets.randbelow(10)) for _ in range(6)])
+
+
+def validate_email_address(email):
+    """Validate email format"""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if not re.match(pattern, email):
+        return "Invalid email format"
+    if len(email) > 120:
+        return "Email is too long"
+    return None
+
+
+def validate_password_strength(password):
+    """Validate password meets security requirements"""
+    errors = []
+    if len(password) < 8:
+        errors.append("Password must be at least 8 characters")
+    if len(password) > 128:
+        errors.append("Password is too long")
+    if not re.search(r'[A-Z]', password):
+        errors.append("Password must contain at least one uppercase letter")
+    if not re.search(r'[a-z]', password):
+        errors.append("Password must contain at least one lowercase letter")
+    if not re.search(r'\d', password):
+        errors.append("Password must contain at least one number")
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        errors.append("Password must contain at least one special character")
+    return errors
+
+
+# ==================== REGISTER ENDPOINT ====================
+
 @auth_bp.route('/register', methods=['POST'])
 def register():
-    """Register new user"""
+    """Register new user - Send OTP for email verification"""
     try:
-        data = request.json
-        email = data.get('email')
-        password = data.get('password')
-        name = data.get('name', email.split('@')[0] if email else 'User')
+        data = request.get_json()
 
-        if not email or not password:
-            return jsonify({'error': 'Email and password required'}), 400
+        name = data.get('name', '').strip()
+        email = data.get('email', '').strip().lower()
+        password = data.get('password', '')
+
+        print(f"📝 Registration attempt: {email}")
+
+        # Validate name
+        if not name or len(name) < 2:
+            return jsonify({'error': 'Name must be at least 2 characters'}), 400
+        if len(name) > 100:
+            return jsonify({'error': 'Name is too long'}), 400
+
+        name = re.sub(r'[<>"\']', '', name)
+
+        # Validate email
+        email_error = validate_email_address(email)
+        if email_error:
+            return jsonify({'error': email_error}), 400
+
+        # Validate password
+        password_errors = validate_password_strength(password)
+        if password_errors:
+            return jsonify({
+                'error': 'Password requirements not met',
+                'details': password_errors
+            }), 400
 
         # Check if user exists
         existing_user = User.query.filter_by(email=email).first()
@@ -35,72 +94,265 @@ def register():
             return jsonify({'error': 'Email already registered'}), 400
 
         # Hash password
-        hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+        hashed_password = bcrypt.generate_password_hash(password, rounds=12).decode('utf-8')
 
-        # Create user
+        # Generate 6-digit OTP
+        otp = generate_otp()
+        otp_created_at = datetime.now(timezone.utc)
+
+        print(f"🔐 Generated OTP for {email}: {otp}")
+
+        # Create user (not verified yet)
         user = User(
+            name=name,
             email=email,
-            password_hash=hashed_password
+            password_hash=hashed_password,
+            is_verified=False,
+            verification_otp=otp,
+            otp_created_at=otp_created_at,
+            otp_attempts=0,
+            created_at=datetime.now(timezone.utc)
         )
+
         db.session.add(user)
         db.session.commit()
 
-        # Create access token with STRING identity
-        access_token = create_access_token(
-            identity=str(user.id),  # ← Convert to string
-            additional_claims={'email': user.email, 'name': user.name},
-            expires_delta=timedelta(days=30)
+        # Send OTP email
+        email_sent = email_service.send_otp_email(
+            user_email=email,
+            user_name=name,
+            otp=otp
         )
 
+        print(f"✅ User registered: {email} (OTP sent: {email_sent})")
+
         return jsonify({
-            'message': 'Registration successful',
-            'token': access_token,
-            'user': {
-                'id': user.id,
-                'email': user.email,
-                'name': user.name
-            }
+            'message': 'Registration successful! Please check your email for OTP.',
+            'email': email,
+            'otp_sent': email_sent,
+            'expires_in': '5 minutes'
         }), 201
 
     except Exception as e:
         db.session.rollback()
-        print(f"Registration error: {e}")
+        print(f"❌ Registration error: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Registration failed. Please try again.'}), 500
 
 
-@auth_bp.route('/login', methods=['POST'])
-def login():
-    """Login user"""
+# ==================== VERIFY OTP ENDPOINT ====================
+
+@auth_bp.route('/verify-otp', methods=['POST'])
+def verify_otp():
+    """Verify OTP and activate user account"""
     try:
-        data = request.json
-        email = data.get('email')
-        password = data.get('password')
+        data = request.get_json()
+        email = data.get('email', '').strip().lower()
+        otp = data.get('otp', '').strip()
 
-        if not email or not password:
-            return jsonify({'error': 'Email and password required'}), 400
+        if not email or not otp:
+            return jsonify({'error': 'Email and OTP are required'}), 400
+
+        print(f"🔍 OTP verification attempt for: {email}")
 
         # Find user
         user = User.query.filter_by(email=email).first()
 
         if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        # Check if already verified
+        if user.is_verified:
+            # Still return token for already verified users
+            access_token = create_access_token(
+                identity=str(user.id),
+                additional_claims={
+                    'email': user.email,
+                    'name': user.name,
+                    'is_verified': True
+                },
+                expires_delta=timedelta(days=7)
+            )
+            return jsonify({
+                'message': 'Email already verified',
+                'token': access_token,
+                'user': user.to_dict()
+            }), 200
+
+        # Check rate limiting (max 5 attempts)
+        if user.otp_attempts >= 5:
+            return jsonify({'error': 'Too many failed attempts. Please request a new OTP.'}), 429
+
+        # ✅ FIXED: Check OTP expiry (5 minutes) - Handle timezone-aware and naive datetimes
+        if user.otp_created_at:
+            now = datetime.now(timezone.utc)
+            otp_created = user.otp_created_at
+
+            # Make otp_created_at timezone-aware if it's naive
+            if otp_created.tzinfo is None:
+                otp_created = otp_created.replace(tzinfo=timezone.utc)
+
+            otp_age = now - otp_created
+
+            if otp_age > timedelta(minutes=5):
+                return jsonify({'error': 'OTP has expired. Please request a new one.'}), 400
+
+        # Verify OTP
+        if user.verification_otp != otp:
+            user.otp_attempts += 1
+            db.session.commit()
+            remaining = 5 - user.otp_attempts
+            return jsonify({
+                'error': 'Invalid OTP',
+                'attempts_remaining': remaining
+            }), 400
+
+        # OTP is valid - verify user
+        user.is_verified = True
+        user.verification_otp = None
+        user.otp_created_at = None
+        user.otp_attempts = 0
+        db.session.commit()
+
+        # Send welcome email
+        email_service.send_welcome_email(user.email, user.name)
+
+        # Create JWT token
+        access_token = create_access_token(
+            identity=str(user.id),
+            additional_claims={
+                'email': user.email,
+                'name': user.name,
+                'is_verified': True
+            },
+            expires_delta=timedelta(days=7)
+        )
+
+        print(f"✅ Email verified successfully: {user.email}")
+
+        return jsonify({
+            'message': 'Email verified successfully! You can now login.',
+            'token': access_token,
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'name': user.name,
+                'is_verified': True
+            }
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ OTP verification error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'OTP verification failed'}), 500
+
+
+# ==================== RESEND OTP ENDPOINT ====================
+
+@auth_bp.route('/resend-otp', methods=['POST'])
+def resend_otp():
+    """Resend OTP for email verification"""
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip().lower()
+
+        if not email:
+            return jsonify({'error': 'Email is required'}), 400
+
+        print(f"📧 Resend OTP request for: {email}")
+
+        user = User.query.filter_by(email=email).first()
+
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        if user.is_verified:
+            return jsonify({'message': 'Email already verified'}), 200
+
+        # Generate new OTP
+        otp = generate_otp()
+        user.verification_otp = otp
+        user.otp_created_at = datetime.now(timezone.utc)
+        user.otp_attempts = 0
+        db.session.commit()
+
+        print(f"🔐 New OTP for {email}: {otp}")
+
+        # Send OTP email
+        email_sent = email_service.send_otp_email(
+            user_email=user.email,
+            user_name=user.name,
+            otp=otp
+        )
+
+        print(f"✅ OTP resent to: {user.email}")
+
+        return jsonify({
+            'message': 'New OTP sent! Please check your email.',
+            'otp_sent': email_sent,
+            'expires_in': '5 minutes'
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Resend OTP error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to resend OTP'}), 500
+
+
+# ==================== LOGIN ENDPOINT ====================
+
+@auth_bp.route('/login', methods=['POST'])
+def login():
+    """Login user - Only if email is verified"""
+    try:
+        data = request.get_json()
+
+        email = data.get('email', '').strip().lower()
+        password = data.get('password', '')
+
+        print(f"🔐 Login attempt: {email}")
+
+        if not email or not password:
+            return jsonify({'error': 'Email and password required'}), 400
+
+        user = User.query.filter_by(email=email).first()
+
+        if not user:
             return jsonify({'error': 'Invalid email or password'}), 401
 
-        # Check password
         if not bcrypt.check_password_hash(user.password_hash, password):
             return jsonify({'error': 'Invalid email or password'}), 401
 
+        # ✅ BLOCK LOGIN IF EMAIL NOT VERIFIED (Industry Standard)
+        if not user.is_verified:
+            return jsonify({
+                'error': 'Email not verified',
+                'message': 'Please verify your email before logging in. Check your inbox for OTP.',
+                'email': user.email,
+                'requires_verification': True
+            }), 403
+
         # Update last login
-        user.last_login = datetime.utcnow()
+        user.last_login = datetime.now(timezone.utc)
         db.session.commit()
 
-        # Create access token with STRING identity
+        # Create JWT token
         access_token = create_access_token(
-            identity=str(user.id),  # ← Convert to string
-            additional_claims={'email': user.email, 'name': user.name},
-            expires_delta=timedelta(days=30)
+            identity=str(user.id),
+            additional_claims={
+                'email': user.email,
+                'name': user.name,
+                'is_verified': user.is_verified
+            },
+            expires_delta=timedelta(days=7)
         )
+
+        print(f"✅ Login successful: {email}")
 
         return jsonify({
             'message': 'Login successful',
@@ -108,39 +360,76 @@ def login():
             'user': {
                 'id': user.id,
                 'email': user.email,
-                'name': user.name
+                'name': user.name,
+                'is_verified': user.is_verified
             }
         }), 200
 
     except Exception as e:
-        print(f"Login error: {e}")
+        print(f"❌ Login error: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'error': 'Login failed. Please try again.'}), 500
+        return jsonify({'error': 'Login failed'}), 500
 
+
+# ==================== GET CURRENT USER ====================
 
 @auth_bp.route('/me', methods=['GET'])
 @jwt_required()
 def get_current_user():
     """Get current user info"""
     try:
-        # Get identity as string and convert to int
         current_user_id = int(get_jwt_identity())
         user = User.query.get(current_user_id)
 
         if not user:
             return jsonify({'error': 'User not found'}), 404
 
-        return jsonify({
-            'user': {
-                'id': user.id,
-                'email': user.email,
-                'name': user.name
-            }
-        }), 200
+        return jsonify({'user': user.to_dict()}), 200
 
     except Exception as e:
-        print(f"Get user error: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        print(f"Error fetching user: {e}")
+        return jsonify({'error': 'Failed to fetch user'}), 500
+
+
+# ==================== CHANGE PASSWORD ====================
+
+@auth_bp.route('/change-password', methods=['POST'])
+@jwt_required()
+def change_password():
+    """Change user password"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        user = User.query.get(current_user_id)
+
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        data = request.get_json()
+        old_password = data.get('old_password', '')
+        new_password = data.get('new_password', '')
+
+        if not bcrypt.check_password_hash(user.password_hash, old_password):
+            return jsonify({'error': 'Current password is incorrect'}), 401
+
+        password_errors = validate_password_strength(new_password)
+        if password_errors:
+            return jsonify({
+                'error': 'Password requirements not met',
+                'details': password_errors
+            }), 400
+
+        if bcrypt.check_password_hash(user.password_hash, new_password):
+            return jsonify({'error': 'New password must be different'}), 400
+
+        user.password_hash = bcrypt.generate_password_hash(new_password, rounds=12).decode('utf-8')
+        db.session.commit()
+
+        print(f"✅ Password changed: {user.email}")
+
+        return jsonify({'message': 'Password changed successfully'}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Change password error: {e}")
+        return jsonify({'error': 'Failed to change password'}), 500

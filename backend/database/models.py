@@ -1,8 +1,7 @@
 """
-Database models for StockPulse
-Complete version with all tables including Chat and Analysis History
+Database models for StockPulse - Complete with OTP Verification
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
@@ -13,34 +12,42 @@ db = SQLAlchemy()
 # ============================================================
 
 class User(db.Model):
-    """User accounts"""
+    """User accounts with OTP-based email verification"""
     __tablename__ = 'users'
 
     id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     last_login = db.Column(db.DateTime)
 
+    # OTP-based Email Verification (Industry Standard)
+    is_verified = db.Column(db.Boolean, default=False, nullable=False, index=True)
+    verification_otp = db.Column(db.String(6), nullable=True)  # 6-digit OTP
+    otp_created_at = db.Column(db.DateTime, nullable=True)
+    otp_attempts = db.Column(db.Integer, default=0)  # Rate limiting
+
+    # Security fields
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    failed_login_attempts = db.Column(db.Integer, default=0)
+    locked_until = db.Column(db.DateTime)
+
     # Relationships
-    watchlists = db.relationship('Watchlist', backref='user', lazy=True, cascade='all, delete-orphan')
+    watchlist = db.relationship('Watchlist', backref='user', lazy=True, cascade='all, delete-orphan')
     alerts = db.relationship('Alert', backref='user', lazy=True, cascade='all, delete-orphan')
     portfolio = db.relationship('Portfolio', backref='user', lazy=True, cascade='all, delete-orphan')
     chat_messages = db.relationship('ChatMessage', backref='user', lazy=True, cascade='all, delete-orphan')
     message_reactions = db.relationship('MessageReaction', backref='user', lazy=True, cascade='all, delete-orphan')
     analysis_history = db.relationship('AnalysisHistory', backref='user', lazy=True, cascade='all, delete-orphan')
 
-    @property
-    def name(self):
-        """Extract name from email"""
-        return self.email.split('@')[0]
-
     def to_dict(self):
         return {
             'id': self.id,
-            'email': self.email,
             'name': self.name,
-            'created_at': self.created_at.isoformat(),
+            'email': self.email,
+            'is_verified': self.is_verified,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_login': self.last_login.isoformat() if self.last_login else None
         }
 
@@ -60,7 +67,7 @@ class Watchlist(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     symbol = db.Column(db.String(20), nullable=False, index=True)
     exchange = db.Column(db.String(10), nullable=False)
-    added_at = db.Column(db.DateTime, default=datetime.utcnow)
+    added_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (db.UniqueConstraint('user_id', 'symbol', 'exchange', name='unique_watchlist'),)
 
@@ -88,11 +95,11 @@ class Alert(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     symbol = db.Column(db.String(20), nullable=False, index=True)
     exchange = db.Column(db.String(10), nullable=False)
-    alert_type = db.Column(db.String(20), nullable=False)  # price, rsi, macd
-    condition = db.Column(db.String(10), nullable=False)  # above, below, equals
+    alert_type = db.Column(db.String(20), nullable=False)
+    condition = db.Column(db.String(10), nullable=False)
     threshold = db.Column(db.Float, nullable=False)
     is_active = db.Column(db.Boolean, default=True, index=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     triggered_at = db.Column(db.DateTime)
 
     def to_dict(self):
@@ -128,7 +135,7 @@ class Portfolio(db.Model):
     buy_price = db.Column(db.Float, nullable=False)
     buy_date = db.Column(db.Date, nullable=False)
     notes = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def to_dict(self):
         return {
@@ -158,7 +165,7 @@ class SearchHistory(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     symbol = db.Column(db.String(20), nullable=False, index=True)
     exchange = db.Column(db.String(10), nullable=False)
-    searched_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    searched_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
     def to_dict(self):
         return {
@@ -185,19 +192,19 @@ class PredictionLog(db.Model):
     exchange = db.Column(db.String(10), nullable=False)
 
     # Prediction details
-    prediction_date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
-    timeframe = db.Column(db.String(20), nullable=False)  # intraday, weekly, monthly, longterm
+    prediction_date = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+    timeframe = db.Column(db.String(20), nullable=False)
     predicted_price = db.Column(db.Float, nullable=False)
     predicted_change_pct = db.Column(db.Float, nullable=False)
     confidence = db.Column(db.Integer, nullable=False)
     current_price_at_prediction = db.Column(db.Float, nullable=False)
 
-    # Actual results (filled later)
+    # Actual results
     target_date = db.Column(db.DateTime, nullable=False, index=True)
     actual_price = db.Column(db.Float)
     actual_change_pct = db.Column(db.Float)
 
-    # Accuracy metrics (calculated later)
+    # Accuracy metrics
     is_accurate = db.Column(db.Boolean, default=False)
     accuracy_pct = db.Column(db.Float)
     profit_if_followed = db.Column(db.Float)
@@ -208,7 +215,7 @@ class PredictionLog(db.Model):
     # Metadata
     model_version = db.Column(db.String(20), default='v3.0')
     features_used = db.Column(db.Integer, default=28)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def to_dict(self):
         return {
@@ -239,7 +246,7 @@ class PredictionLog(db.Model):
 
 
 # ============================================================
-# ANALYSIS HISTORY (NEW)
+# ANALYSIS HISTORY
 # ============================================================
 
 class AnalysisHistory(db.Model):
@@ -251,13 +258,12 @@ class AnalysisHistory(db.Model):
     symbol = db.Column(db.String(20), nullable=False, index=True)
     name = db.Column(db.String(255))
     exchange = db.Column(db.String(10), default='NSE')
-    analyzed_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    analyzed_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
     current_price = db.Column(db.Float, default=0)
-    predictions = db.Column(db.JSON)  # Store predictions as JSON
-    technical = db.Column(db.JSON)    # Store technical indicators as JSON
+    predictions = db.Column(db.JSON)
+    technical = db.Column(db.JSON)
 
     def to_dict(self):
-        """Convert model to dictionary"""
         return {
             'id': self.id,
             'user_id': self.user_id,
@@ -286,8 +292,8 @@ class ChatMessage(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     username = db.Column(db.String(100), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    message_type = db.Column(db.String(20), default='text')  # text, analysis
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    message_type = db.Column(db.String(20), default='text')
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     is_deleted = db.Column(db.Boolean, default=False, index=True)
     report_count = db.Column(db.Integer, default=0)
 
@@ -317,7 +323,7 @@ class MessageReaction(db.Model):
     message_id = db.Column(db.Integer, db.ForeignKey('chat_messages.id'), nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     emoji = db.Column(db.String(10), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (db.UniqueConstraint('message_id', 'user_id', 'emoji', name='unique_reaction'),)
 
@@ -339,7 +345,7 @@ class OnlineUser(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     socket_id = db.Column(db.String(100), nullable=True)
-    last_seen = db.Column(db.DateTime, default=datetime.utcnow)
+    last_seen = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def to_dict(self):
         return {

@@ -1,9 +1,5 @@
-// frontend/src/pages/Login.jsx - Complete Fixed Version
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import RgvNamaste from '../components/NamasteWelcome';
 import axios from 'axios';
 
 export default function Login() {
@@ -11,7 +7,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(false);
+  const [requiresVerification, setRequiresVerification] = useState(false);
   const [marketData, setMarketData] = useState({
     nifty50: { value: '---', change: '+0.00', changePercent: '+0.00%', isPositive: true },
     sensex: { value: '---', change: '+0.00', changePercent: '+0.00%', isPositive: true },
@@ -19,16 +15,7 @@ export default function Login() {
     silver: { value: '---', change: '0', changePercent: '0.00%', isPositive: false }
   });
 
-  const { login, user } = useAuth();
   const navigate = useNavigate();
-
-  // Redirect if already logged in
-  useEffect(() => {
-    if (user && !showWelcome) {
-      console.log('User already logged in, redirecting to dashboard...');
-      navigate('/dashboard', { replace: true });
-    }
-  }, [user, navigate, showWelcome]);
 
   // Fetch real-time market data every 10 seconds
   useEffect(() => {
@@ -79,44 +66,43 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setRequiresVerification(false);
     setLoading(true);
 
     try {
-      await login(email, password);
-      console.log('✅ Login successful, showing RGV Namaste animation...');
-      setShowWelcome(true);
-      // Keep loading true to prevent form from re-rendering
-    } catch (error) {
-      console.error('❌ Login failed:', error);
-      if (error.response?.data?.error) {
-        setError(error.response.data.error);
-      } else if (error.message) {
-        setError(error.message);
+      console.log('🔐 Attempting login...');
+
+      const response = await axios.post('http://localhost:5000/api/auth/login', {
+        email: email.trim().toLowerCase(),
+        password: password
+      });
+
+      console.log('✅ Login successful:', response.data);
+
+      // Save token
+      localStorage.setItem('token', response.data.token);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+
+      // Redirect to dashboard
+      navigate('/dashboard');
+
+    } catch (err) {
+      console.error('❌ Login failed:', err);
+
+      if (err.response?.status === 403 && err.response?.data?.requires_verification) {
+        // Email not verified - block login
+        setRequiresVerification(true);
+        setError(err.response.data.message || 'Please verify your email before logging in.');
       } else {
-        setError('Login failed. Please check your credentials.');
+        setError(err.response?.data?.error || 'Login failed. Please check your credentials.');
       }
       setLoading(false);
     }
   };
 
-  const handleWelcomeComplete = () => {
-    console.log('✅ RGV Namaste complete, navigating to dashboard...');
-    navigate('/dashboard', { replace: true });
+  const handleGoToVerify = () => {
+    navigate('/verify-otp', { state: { email: email.trim().toLowerCase() } });
   };
-
-  // Show welcome animation if login successful
-  if (showWelcome) {
-    return <RgvNamaste onComplete={handleWelcomeComplete} />;
-  }
-
-  // Show loading if user exists but redirect hasn't happened yet
-  if (user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950">
-        <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
@@ -509,11 +495,24 @@ export default function Login() {
             </div>
 
             {error && (
-              <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start gap-3 backdrop-blur-sm">
-                <svg className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p className="text-sm text-red-300">{error}</p>
+              <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl backdrop-blur-sm">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm text-red-300">{error}</p>
+                    {requiresVerification && (
+                      <button
+                        type="button"
+                        onClick={handleGoToVerify}
+                        className="w-full mt-3 px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-lg text-sm font-medium transition-colors"
+                      >
+                        Verify Email Now
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 

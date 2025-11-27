@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import VerifyOTP from './pages/VerifyOTP';
 import Dashboard from './pages/Dashboard';
 import Watchlist from './pages/Watchlist';
 import Portfolio from './pages/Portfolio';
@@ -19,7 +20,7 @@ function PrivateRoute({ children }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950">
         <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full"></div>
       </div>
     );
@@ -43,6 +44,9 @@ function AppContent() {
         <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Landing />} />
         <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
         <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <Register />} />
+
+        {/* OTP Verification Route - NEW */}
+        <Route path="/verify-otp" element={<VerifyOTP />} />
 
         {/* Protected Routes */}
         <Route
@@ -93,6 +97,9 @@ function AppContent() {
             </PrivateRoute>
           }
         />
+
+        {/* 404 Fallback */}
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
 
       {/* Global Chat - Only show for logged-in users */}
