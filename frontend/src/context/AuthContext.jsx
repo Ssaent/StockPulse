@@ -52,25 +52,56 @@ export const AuthProvider = ({ children }) => {
       console.log('✅ Token saved to localStorage:', token);
       setUser(user);
 
-      return user;
+      return { success: true, user };
     } catch (error) {
       console.error('Login failed:', error);
+
+      // Handle OTP verification requirement
+      if (error.response?.data?.requires_verification) {
+        return {
+          success: false,
+          requiresVerification: true,
+          email: error.response.data.email
+        };
+      }
+
       throw error;
     }
   };
 
-  const register = async (email, password) => {
+  const register = async (name, email, password) => {
     try {
-      const response = await authAPI.register(email, password);
+      const response = await authAPI.register(name, email, password);
+      // Register only sends OTP, doesn't return token/user yet
+      return { success: true, email };
+    } catch (error) {
+      console.error('Registration failed:', error);
+      throw error;
+    }
+  };
+
+  const verifyOTP = async (email, otp) => {
+    try {
+      const response = await authAPI.verifyOTP(email, otp);
       const { token, user } = response.data;
 
       localStorage.setItem('token', token);
-      console.log('✅ Token saved to localStorage:', token);
+      console.log('✅ OTP verified, token saved:', token);
       setUser(user);
 
-      return user;
+      return { success: true, user };
     } catch (error) {
-      console.error('Registration failed:', error);
+      console.error('OTP verification failed:', error);
+      throw error;
+    }
+  };
+
+  const resendOTP = async (email) => {
+    try {
+      const response = await authAPI.resendOTP(email);
+      return { success: true };
+    } catch (error) {
+      console.error('Resend OTP failed:', error);
       throw error;
     }
   };
@@ -78,13 +109,14 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
-    // Simple - just clear token, let ProtectedRoute handle redirect
   };
 
   const value = {
     user,
     login,
     register,
+    verifyOTP,
+    resendOTP,
     logout,
     loading,
     isAuthenticated: !!user

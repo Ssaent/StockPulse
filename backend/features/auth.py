@@ -184,7 +184,7 @@ def verify_otp():
         if user.otp_attempts >= 5:
             return jsonify({'error': 'Too many failed attempts. Please request a new OTP.'}), 429
 
-        # ✅ FIXED: Check OTP expiry (5 minutes) - Handle timezone-aware and naive datetimes
+        # Check OTP expiry (5 minutes)
         if user.otp_created_at:
             now = datetime.now(timezone.utc)
             otp_created = user.otp_created_at
@@ -304,6 +304,145 @@ def resend_otp():
         return jsonify({'error': 'Failed to resend OTP'}), 500
 
 
+# ==================== FORGOT PASSWORD ENDPOINT ====================
+
+@auth_bp.route('/forgot-password', methods=['POST'])
+def forgot_password():
+    """Send password reset OTP"""
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip().lower()
+
+        if not email:
+            return jsonify({'error': 'Email is required'}), 400
+
+        print(f"🔐 Password reset request for: {email}")
+
+        user = User.query.filter_by(email=email).first()
+
+        # Don't reveal if user exists (security best practice)
+        if not user:
+            # Still return success to prevent email enumeration
+            return jsonify({
+                'message': 'If an account exists with this email, you will receive reset instructions.',
+                'email': email
+            }), 200
+
+        # Generate reset OTP
+        reset_otp = generate_otp()
+        user.verification_otp = reset_otp
+        user.otp_created_at = datetime.now(timezone.utc)
+        user.otp_attempts = 0
+        db.session.commit()
+
+        print(f"🔐 Password reset OTP for {email}: {reset_otp}")
+
+        # Send reset email
+        email_sent = email_service.send_password_reset_email(
+            user_email=user.email,
+            user_name=user.name,
+            otp=reset_otp
+        )
+
+        print(f"✅ Password reset email sent to: {user.email}")
+
+        return jsonify({
+            'message': 'Password reset instructions sent to your email.',
+            'email': email,
+            'otp_sent': email_sent
+        }), 200
+
+    except Exception as e:
+        print(f"❌ Forgot password error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to process request'}), 500
+
+
+# ==================== RESET PASSWORD ENDPOINT ====================
+
+@auth_bp.route('/reset-password', methods=['POST'])
+def reset_password():
+    """Reset password using OTP"""
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip().lower()
+        otp = data.get('otp', '').strip()
+        new_password = data.get('new_password', '')
+
+        if not email or not otp or not new_password:
+            return jsonify({'error': 'Email, OTP, and new password are required'}), 400
+
+        print(f"🔐 Password reset attempt for: {email}")
+
+        user = User.query.filter_by(email=email).first()
+
+        if not user:
+            return jsonify({'error': 'Invalid request'}), 400
+
+        # Check rate limiting
+        if user.otp_attempts >= 5:
+            return jsonify({'error': 'Too many failed attempts. Please request a new reset code.'}), 429
+
+        # Check OTP expiry (10 minutes for password reset)
+        if user.otp_created_at:
+            now = datetime.now(timezone.utc)
+            otp_created = user.otp_created_at
+
+            if otp_created.tzinfo is None:
+                otp_created = otp_created.replace(tzinfo=timezone.utc)
+
+            otp_age = now - otp_created
+
+            if otp_age > timedelta(minutes=10):
+                return jsonify({'error': 'Reset code has expired. Please request a new one.'}), 400
+
+        # Verify OTP
+        if user.verification_otp != otp:
+            user.otp_attempts += 1
+            db.session.commit()
+            remaining = 5 - user.otp_attempts
+            return jsonify({
+                'error': 'Invalid reset code',
+                'attempts_remaining': remaining
+            }), 400
+
+        # Validate new password
+        password_errors = validate_password_strength(new_password)
+        if password_errors:
+            return jsonify({
+                'error': 'Password requirements not met',
+                'details': password_errors
+            }), 400
+
+        # Check if new password is same as old
+        if bcrypt.check_password_hash(user.password_hash, new_password):
+            return jsonify({'error': 'New password must be different from current password'}), 400
+
+        # Update password
+        user.password_hash = bcrypt.generate_password_hash(new_password, rounds=12).decode('utf-8')
+        user.verification_otp = None
+        user.otp_created_at = None
+        user.otp_attempts = 0
+        db.session.commit()
+
+        print(f"✅ Password reset successful: {user.email}")
+
+        # Send confirmation email
+        email_service.send_password_changed_email(user.email, user.name)
+
+        return jsonify({
+            'message': 'Password reset successfully. You can now login with your new password.'
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Password reset error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to reset password'}), 500
+
+
 # ==================== LOGIN ENDPOINT ====================
 
 @auth_bp.route('/login', methods=['POST'])
@@ -328,7 +467,7 @@ def login():
         if not bcrypt.check_password_hash(user.password_hash, password):
             return jsonify({'error': 'Invalid email or password'}), 401
 
-        # ✅ BLOCK LOGIN IF EMAIL NOT VERIFIED (Industry Standard)
+        # BLOCK LOGIN IF EMAIL NOT VERIFIED
         if not user.is_verified:
             return jsonify({
                 'error': 'Email not verified',

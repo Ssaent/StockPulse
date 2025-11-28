@@ -40,9 +40,14 @@ api.interceptors.response.use(
 );
 
 export const authAPI = {
-  register: (email, password) => api.post('/auth/register', { email, password }),
+  register: (name, email, password) => api.post('/auth/register', { name, email, password }), // ✅ FIXED: Added name
   login: (email, password) => api.post('/auth/login', { email, password }),
+  verifyOTP: (email, otp) => api.post('/auth/verify-otp', { email, otp }), // ✅ ADDED
+  resendOTP: (email) => api.post('/auth/resend-otp', { email }), // ✅ ADDED
   getCurrentUser: () => api.get('/auth/me'),
+  forgotPassword: (email) => api.post('/auth/forgot-password', { email }), // ✅ ADDED
+  resetPassword: (email, otp, newPassword) => api.post('/auth/reset-password', { email, otp, new_password: newPassword }), // ✅ ADDED
+  changePassword: (data) => api.post('/auth/change-password', data), // ✅ ADDED
 };
 
 export const stockAPI = {

@@ -333,6 +333,230 @@ class EmailService:
 
         return self.send_email(user_email, subject, html_body, text_body)
 
+    def send_password_reset_email(self, user_email, user_name, otp):
+        """Send password reset email with OTP"""
+        subject = "🔐 Reset Your StockPulse Password"
+
+        html_body = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Reset Your Password</title>
+        </head>
+        <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="min-height: 100vh;">
+                <tr>
+                    <td align="center" style="padding: 40px 20px;">
+                        <table width="600" cellpadding="0" cellspacing="0" style="background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; max-width: 100%;">
+                            
+                            <!-- Header -->
+                            <tr>
+                                <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px; text-align: center;">
+                                    <h1 style="margin: 0; color: white; font-size: 32px; font-weight: bold;">
+                                        🔐 StockPulse
+                                    </h1>
+                                    <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.9); font-size: 16px;">
+                                        Password Reset Request
+                                    </p>
+                                </td>
+                            </tr>
+                            
+                            <!-- Body -->
+                            <tr>
+                                <td style="padding: 40px;">
+                                    <h2 style="margin: 0 0 20px 0; color: #1a1a1a; font-size: 24px;">
+                                        Hi {user_name},
+                                    </h2>
+                                    
+                                    <p style="margin: 0 0 20px 0; color: #666; font-size: 16px; line-height: 1.6;">
+                                        We received a request to reset your password. Use the code below to reset it:
+                                    </p>
+                                    
+                                    <!-- OTP Box -->
+                                    <table width="100%" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
+                                        <tr>
+                                            <td align="center">
+                                                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 15px; display: inline-block;">
+                                                    <p style="margin: 0 0 10px 0; color: rgba(255,255,255,0.9); font-size: 14px; text-transform: uppercase; letter-spacing: 2px; font-weight: 600;">
+                                                        Reset Code
+                                                    </p>
+                                                    <p style="margin: 0; color: white; font-size: 48px; font-weight: bold; letter-spacing: 8px; font-family: 'Courier New', monospace;">
+                                                        {otp}
+                                                    </p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                    
+                                    <!-- Info Box -->
+                                    <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8f9fa; border-radius: 10px; margin: 20px 0;">
+                                        <tr>
+                                            <td style="padding: 20px;">
+                                                <p style="margin: 0 0 10px 0; color: #666; font-size: 14px;">
+                                                    ⏰ <strong>This code expires in 10 minutes</strong>
+                                                </p>
+                                                <p style="margin: 0; color: #666; font-size: 14px;">
+                                                    🔒 For security, never share this code with anyone
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                    
+                                    <p style="margin: 20px 0 0 0; color: #666; font-size: 14px; line-height: 1.6;">
+                                        If you didn't request this password reset, please ignore this email or contact support if you have concerns.
+                                    </p>
+                                </td>
+                            </tr>
+                            
+                            <!-- Footer -->
+                            <tr>
+                                <td style="background: #f8f9fa; padding: 30px; text-align: center; border-top: 1px solid #e0e0e0;">
+                                    <p style="margin: 0 0 10px 0; color: #999; font-size: 14px;">
+                                        © {datetime.now().year} StockPulse. All rights reserved.
+                                    </p>
+                                    <p style="margin: 0; color: #999; font-size: 12px;">
+                                        AI-Powered Stock Market Predictions
+                                    </p>
+                                </td>
+                            </tr>
+                            
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        """
+
+        text_body = f"""
+        Reset Your StockPulse Password
+        
+        Hi {user_name},
+        
+        Your password reset code is: {otp}
+        
+        This code will expire in 10 minutes.
+        
+        If you didn't request this, please ignore this email.
+        
+        Best regards,
+        The StockPulse Team
+        """
+
+        print(f"\n🔐 Password reset OTP for {user_name} ({user_email}): {otp}\n")
+
+        return self.send_email(user_email, subject, html_body, text_body)
+
+    def send_password_changed_email(self, user_email, user_name):
+        """Send confirmation email after password change"""
+        subject = "✅ Your StockPulse Password Has Been Changed"
+
+        html_body = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Password Changed</title>
+        </head>
+        <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); min-height: 100vh;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="min-height: 100vh;">
+                <tr>
+                    <td align="center" style="padding: 40px 20px;">
+                        <table width="600" cellpadding="0" cellspacing="0" style="background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; max-width: 100%;">
+                            
+                            <!-- Header -->
+                            <tr>
+                                <td style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); padding: 40px; text-align: center;">
+                                    <div style="background: white; width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center;">
+                                        <span style="font-size: 48px;">✅</span>
+                                    </div>
+                                    <h1 style="margin: 0; color: white; font-size: 28px; font-weight: bold;">
+                                        Password Changed Successfully
+                                    </h1>
+                                </td>
+                            </tr>
+                            
+                            <!-- Body -->
+                            <tr>
+                                <td style="padding: 40px;">
+                                    <h2 style="margin: 0 0 20px 0; color: #1a1a1a; font-size: 24px;">
+                                        Hi {user_name},
+                                    </h2>
+                                    
+                                    <p style="margin: 0 0 20px 0; color: #666; font-size: 16px; line-height: 1.6;">
+                                        Your StockPulse password has been successfully changed. You can now log in with your new password.
+                                    </p>
+                                    
+                                    <!-- Security Notice -->
+                                    <table width="100%" cellpadding="0" cellspacing="0" style="background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 8px; margin: 20px 0;">
+                                        <tr>
+                                            <td style="padding: 20px;">
+                                                <p style="margin: 0 0 10px 0; color: #856404; font-size: 16px; font-weight: 600;">
+                                                    ⚠️ Didn't make this change?
+                                                </p>
+                                                <p style="margin: 0; color: #856404; font-size: 14px; line-height: 1.6;">
+                                                    If you didn't change your password, please contact our support team immediately at <a href="mailto:support@stockpulse.com" style="color: #667eea; text-decoration: none; font-weight: 600;">support@stockpulse.com</a>
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                    
+                                    <p style="margin: 20px 0 0 0; color: #666; font-size: 14px; line-height: 1.6;">
+                                        For your security, we recommend:
+                                    </p>
+                                    <ul style="margin: 10px 0; padding-left: 20px; color: #666; font-size: 14px; line-height: 1.8;">
+                                        <li>Using a unique password for StockPulse</li>
+                                        <li>Enabling two-factor authentication</li>
+                                        <li>Never sharing your password with anyone</li>
+                                    </ul>
+                                </td>
+                            </tr>
+                            
+                            <!-- Footer -->
+                            <tr>
+                                <td style="background: #f8f9fa; padding: 30px; text-align: center; border-top: 1px solid #e0e0e0;">
+                                    <p style="margin: 0 0 10px 0; color: #999; font-size: 14px;">
+                                        © {datetime.now().year} StockPulse. All rights reserved.
+                                    </p>
+                                    <p style="margin: 0; color: #999; font-size: 12px;">
+                                        AI-Powered Stock Market Predictions
+                                    </p>
+                                </td>
+                            </tr>
+                            
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        """
+
+        text_body = f"""
+        Password Changed Successfully
+        
+        Hi {user_name},
+        
+        Your StockPulse password has been successfully changed.
+        
+        If you didn't make this change, please contact support@stockpulse.com immediately.
+        
+        Security tips:
+        - Use a unique password
+        - Enable two-factor authentication
+        - Never share your password
+        
+        Best regards,
+        The StockPulse Team
+        """
+
+        print(f"\n✅ Password changed confirmation sent to {user_name} ({user_email})\n")
+
+        return self.send_email(user_email, subject, html_body, text_body)
+
 
 # Initialize email service
 email_service = EmailService()
