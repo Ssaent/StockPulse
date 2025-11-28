@@ -7,6 +7,10 @@ import Register from './pages/Register';
 import VerifyOTP from './pages/VerifyOTP';
 import Namaste from "./components/RgvNamaste";
 import Dashboard from './pages/Dashboard';
+import TermsOfService from './pages/TermsOfService';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import Security from './pages/Security';
+import ForgotPassword from './pages/ForgotPassword';
 import Watchlist from './pages/Watchlist';
 import Portfolio from './pages/Portfolio';
 import Alerts from './pages/Alerts';
@@ -45,6 +49,10 @@ function AppContent() {
         <Route path="/" element={user ? <Navigate to="/namaste" /> : <Landing />} /> {/* ✅ UPDATED */}
         <Route path="/login" element={user ? <Navigate to="/namaste" /> : <Login />} /> {/* ✅ UPDATED */}
         <Route path="/register" element={user ? <Navigate to="/namaste" /> : <Register />} /> {/* ✅ UPDATED */}
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/security" element={<Security />} />
 
         {/* OTP Verification Route */}
         <Route path="/verify-otp" element={<VerifyOTP />} />
