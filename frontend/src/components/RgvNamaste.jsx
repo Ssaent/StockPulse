@@ -15,8 +15,10 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // ✅ ADDED
 
-const RgvNamaste = ({ onComplete }) => {
+const RgvNamaste = () => { // ✅ REMOVED onComplete prop
+  const navigate = useNavigate(); // ✅ ADDED
   const [stage, setStage] = useState('void');
   const [opacity, setOpacity] = useState(0);
   const [scale, setScale] = useState(1.4);
@@ -26,7 +28,6 @@ const RgvNamaste = ({ onComplete }) => {
 
   useEffect(() => {
     console.log('🎬 RGV Namaste animation started');
-    console.log('📞 onComplete callback:', onComplete ? 'Present ✅' : 'Missing ❌');
 
     // Stage timings mirror your Nolan version (total ~6s)
     // 0–500ms: Void
@@ -70,23 +71,17 @@ const RgvNamaste = ({ onComplete }) => {
       setGlow(0.15);
     }, 5000);
 
-    // 6000ms: Complete
+    // 6000ms: Complete - REDIRECT TO DASHBOARD
     const t5 = setTimeout(() => {
-      console.log('✅ Animation complete!');
-      console.log('📞 Calling onComplete...');
-      if (onComplete) {
-        onComplete();
-        console.log('✅ onComplete called successfully');
-      } else {
-        console.error('❌ onComplete is undefined!');
-      }
+      console.log('✅ Animation complete! Redirecting to dashboard...');
+      navigate('/dashboard'); // ✅ ADDED: Redirect to dashboard
     }, 6000);
 
     return () => {
       console.log('🧹 Cleaning up RGV Namaste');
       [t0, t1, t2, t3, t4, t5].forEach(clearTimeout);
     };
-  }, [onComplete]);
+  }, [navigate]); // ✅ ADDED navigate dependency
 
   /* -------------------- Layers -------------------- */
 

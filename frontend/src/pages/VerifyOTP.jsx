@@ -1,90 +1,120 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import axios from 'axios';
-import { TrendingUp, Mail, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export default function VerifyOTP() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const email = location.state?.email || '';
-
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [resending, setResending] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
-  const [attemptsRemaining, setAttemptsRemaining] = useState(5);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [userName, setUserName] = useState('');
 
-  // Redirect if no email provided
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { verifyOTP, resendOTP } = useAuth();
+
+  // Get email from navigation state or prompt user
   useEffect(() => {
-    if (!email) {
-      navigate('/register');
+    const stateEmail = location.state?.email;
+
+    if (stateEmail) {
+      setEmail(stateEmail);
+      // Extract name from email for greeting
+      const nameFromEmail = stateEmail.split('@')[0];
+      setUserName(nameFromEmail.charAt(0).toUpperCase() + nameFromEmail.slice(1));
+    } else {
+      // If no email in state, try to get from localStorage or prompt
+      const storedEmail = localStorage.getItem('pendingVerificationEmail');
+      if (storedEmail) {
+        setEmail(storedEmail);
+        const nameFromEmail = storedEmail.split('@')[0];
+        setUserName(nameFromEmail.charAt(0).toUpperCase() + nameFromEmail.slice(1));
+      } else {
+        // Redirect back if no email available
+        navigate('/register');
+      }
     }
-  }, [email, navigate]);
+  }, [location, navigate]);
 
-  // Countdown timer
-  useEffect(() => {
-    if (timeLeft <= 0) return;
+  // Handle OTP input changes
+  const handleOtpChange = (element, index) => {
+    if (isNaN(element.value)) return false;
 
-    const timer = setInterval(() => {
-      setTimeLeft(prev => prev - 1);
-    }, 1000);
+    setOtp([...otp.map((d, idx) => (idx === index ? element.value : d))]);
 
-    return () => clearInterval(timer);
-  }, [timeLeft]);
-
-  // Format time as MM:SS
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // Handle OTP input change
-  const handleChange = (index, value) => {
-    if (!/^\d*$/.test(value)) return; // Only allow digits
-
-    const newOtp = [...otp];
-    newOtp[index] = value;
-    setOtp(newOtp);
-    setError('');
-
-    // Auto-focus next input
-    if (value && index < 5) {
-      document.getElementById(`otp-${index + 1}`)?.focus();
+    // Focus next input
+    if (element.nextSibling && element.value !== '') {
+      element.nextSibling.focus();
     }
   };
 
-  // Handle backspace
-  const handleKeyDown = (index, e) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      document.getElementById(`otp-${index - 1}`)?.focus();
+  // Handle key events for OTP inputs
+  const handleKeyDown = (e, index) => {
+    if (e.key === 'Backspace') {
+      if (otp[index] === '' && e.target.previousSibling) {
+        e.target.previousSibling.focus();
+      }
+      setOtp([...otp.map((d, idx) => (idx === index ? '' : d))]);
     }
   };
 
-  // Handle paste
+  // Handle paste event
   const handlePaste = (e) => {
     e.preventDefault();
-    const pastedData = e.clipboardData.getData('text').slice(0, 6);
+    const pasteData = e.clipboardData.getData('text').slice(0, 6);
+    if (!/^\d+$/.test(pasteData)) return;
 
-    if (!/^\d+$/.test(pastedData)) return;
-
-    const newOtp = pastedData.split('');
-    while (newOtp.length < 6) newOtp.push('');
-
+    const newOtp = pasteData.split('').concat(Array(6 - pasteData.length).fill(''));
     setOtp(newOtp);
-    document.getElementById('otp-5')?.focus();
+
+    // Focus the last input
+    const inputs = document.querySelectorAll('.otp-input');
+    const focusIndex = Math.min(pasteData.length, 5);
+    if (inputs[focusIndex]) {
+      inputs[focusIndex].focus();
+    }
   };
 
-  // Submit OTP
-  const handleSubmit = async (e) => {
+  // Resend OTP
+  const handleResendOTP = async () => {
+    if (resendCooldown > 0) return;
+
+    setResendLoading(true);
+    setError('');
+
+    try {
+      await resendOTP(email);
+      setSuccess('New OTP sent to your email!');
+      setResendCooldown(30); // 30 seconds cooldown
+
+      // Start cooldown timer
+      const timer = setInterval(() => {
+        setResendCooldown(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to resend OTP. Please try again.');
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
+  // Verify OTP
+  const handleVerify = async (e) => {
     e.preventDefault();
 
-    const otpCode = otp.join('');
-
-    if (otpCode.length !== 6) {
-      setError('Please enter all 6 digits');
+    const otpString = otp.join('');
+    if (otpString.length !== 6) {
+      setError('Please enter the complete 6-digit OTP');
       return;
     }
 
@@ -92,154 +122,171 @@ export default function VerifyOTP() {
     setError('');
 
     try {
-      console.log('🔐 Verifying OTP...');
+      const result = await verifyOTP(email, otpString);
 
-      const response = await axios.post('http://localhost:5000/api/auth/verify-otp', {
-        email: email,
-        otp: otpCode
-      });
+      if (result.success) {
+        setSuccess('Email verified successfully! Redirecting...');
 
-      console.log('✅ OTP verified:', response.data);
+        // Clear pending email from storage
+        localStorage.removeItem('pendingVerificationEmail');
 
-      // Save token
-      localStorage.setItem('token', response.data.token);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
-
-      setSuccess('Email verified successfully! Redirecting...');
-
-      // Redirect to dashboard after 1.5 seconds
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 1500);
-
-    } catch (err) {
-      console.error('❌ OTP verification failed:', err);
-
-      if (err.response?.data?.attempts_remaining !== undefined) {
-        setAttemptsRemaining(err.response.data.attempts_remaining);
+        // Redirect to Namaste page after short delay
+        setTimeout(() => {
+          navigate('/namaste');
+        }, 1500);
       }
+    } catch (err) {
+      console.error('OTP verification error:', err);
+      setError(err.response?.data?.error || 'Verification failed. Please check the OTP and try again.');
 
-      setError(err.response?.data?.error || 'Invalid OTP. Please try again.');
-      setOtp(['', '', '', '', '', '']); // Clear OTP
-      document.getElementById('otp-0')?.focus();
+      // Clear OTP on error for security
+      setOtp(['', '', '', '', '', '']);
+
+      // Focus first input
+      const firstInput = document.querySelector('.otp-input');
+      if (firstInput) firstInput.focus();
     } finally {
       setLoading(false);
     }
   };
 
-  // Resend OTP
-  const handleResendOTP = async () => {
-    setResending(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      console.log('📧 Resending OTP...');
-
-      const response = await axios.post('http://localhost:5000/api/auth/resend-otp', {
-        email: email
-      });
-
-      console.log('✅ OTP resent:', response.data);
-
-      setSuccess('New OTP sent! Please check your email.');
-      setTimeLeft(300); // Reset timer to 5 minutes
-      setAttemptsRemaining(5); // Reset attempts
-      setOtp(['', '', '', '', '', '']); // Clear OTP
-      document.getElementById('otp-0')?.focus();
-
-    } catch (err) {
-      console.error('❌ Resend OTP failed:', err);
-      setError(err.response?.data?.error || 'Failed to resend OTP. Please try again.');
-    } finally {
-      setResending(false);
+  // Auto-submit when all OTP digits are entered
+  useEffect(() => {
+    const otpString = otp.join('');
+    if (otpString.length === 6 && !loading) {
+      handleVerify(new Event('submit'));
     }
-  };
+  }, [otp]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 py-12">
-      <div className="max-w-md w-full">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
-              <TrendingUp className="w-7 h-7 text-white" />
-            </div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">
-              StockPulse
-            </h1>
-          </div>
-          <h2 className="text-2xl font-bold mb-2">Verify Your Email</h2>
-          <p className="text-gray-400">
-            We've sent a 6-digit code to <strong className="text-white">{email}</strong>
-          </p>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950 relative overflow-hidden p-4">
+      {/* Animated Background */}
+      <div className="absolute inset-0 overflow-hidden">
+        {/* Floating elements */}
+        <div className="absolute top-1/4 left-1/4 w-8 h-8 bg-blue-500/20 rounded-full animate-pulse"></div>
+        <div className="absolute top-1/3 right-1/4 w-6 h-6 bg-purple-500/30 rounded-full animate-bounce"></div>
+        <div className="absolute bottom-1/3 left-1/3 w-10 h-10 bg-indigo-500/15 rounded-full animate-ping"></div>
+        <div className="absolute bottom-1/4 right-1/3 w-4 h-4 bg-emerald-500/25 rounded-full animate-pulse"></div>
+
+        {/* Security icons */}
+        <div className="absolute top-1/2 left-1/6 opacity-10">
+          <svg className="w-16 h-16 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
         </div>
 
-        {/* Verification Form */}
-        <div className="glass rounded-2xl p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Success Message */}
-            {success && (
-              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 flex items-start gap-3">
-                <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-green-300">{success}</p>
-              </div>
+        <div className="absolute bottom-1/4 left-1/6 opacity-10">
+          <svg className="w-12 h-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+        </div>
+      </div>
+
+      <div className="w-full max-w-md relative z-10">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 mb-6 hover:opacity-80 transition-opacity"
+          >
+            <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/50">
+              <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+              StockPulse
+            </h1>
+          </Link>
+
+          <div className="mb-6">
+            <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/25">
+              <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+            </div>
+
+            <h2 className="text-3xl font-bold text-white mb-2">
+              Verify Your Email
+            </h2>
+
+            {userName && (
+              <p className="text-lg text-slate-300 mb-1">
+                Hello, <span className="font-semibold text-emerald-400">{userName}</span>! 👋
+              </p>
             )}
 
-            {/* Error Message */}
-            {error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm text-red-300">{error}</p>
-                  {attemptsRemaining < 5 && (
-                    <p className="text-xs text-red-400 mt-1">
-                      Attempts remaining: {attemptsRemaining}
-                    </p>
-                  )}
+            <p className="text-slate-400">
+              Enter the 6-digit code sent to
+            </p>
+            <p className="text-slate-300 font-medium">{email}</p>
+          </div>
+        </div>
+
+        {/* Verification Card */}
+        <div className="bg-slate-900/50 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/50 p-8 border border-slate-800">
+          {/* Success Message */}
+          {success && (
+            <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl backdrop-blur-sm">
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p className="text-sm text-emerald-300">{success}</p>
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* OTP Input Boxes */}
-            <div>
-              <label className="block text-sm font-medium mb-3 text-center">
-                Enter Verification Code
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl backdrop-blur-sm">
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p className="text-sm text-red-300">{error}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* OTP Form */}
+          <form onSubmit={handleVerify}>
+            <div className="mb-8">
+              <label className="block text-sm font-semibold text-slate-300 mb-4 text-center">
+                6-Digit Verification Code
               </label>
-              <div className="flex gap-2 justify-center">
-                {otp.map((digit, index) => (
+
+              <div className="flex justify-center gap-3 mb-6" onPaste={handlePaste}>
+                {otp.map((data, index) => (
                   <input
                     key={index}
-                    id={`otp-${index}`}
+                    className="otp-input w-12 h-12 bg-slate-800/50 border border-slate-700 rounded-xl text-center text-white text-xl font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all backdrop-blur-sm"
                     type="text"
-                    maxLength={1}
-                    value={digit}
-                    onChange={(e) => handleChange(index, e.target.value)}
-                    onKeyDown={(e) => handleKeyDown(index, e)}
-                    onPaste={index === 0 ? handlePaste : undefined}
-                    className="w-12 h-14 text-center text-2xl font-bold bg-white/5 border border-gray-600 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                    name="otp"
+                    maxLength="1"
+                    value={data}
+                    onChange={e => handleOtpChange(e.target, index)}
+                    onKeyDown={e => handleKeyDown(e, index)}
+                    onFocus={e => e.target.select()}
                     disabled={loading || success}
-                    required
+                    autoComplete="one-time-code"
                   />
                 ))}
               </div>
+
+              <p className="text-center text-sm text-slate-400">
+                Check your email for the verification code
+              </p>
             </div>
 
-            {/* Timer */}
-            <div className="text-center">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                <Mail className="w-4 h-4 text-blue-400" />
-                <span className="text-sm text-blue-300">
-                  Code expires in: <strong>{formatTime(timeLeft)}</strong>
-                </span>
-              </div>
-            </div>
-
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading || success || otp.join('').length !== 6}
-              className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3.5 px-4 rounded-xl font-semibold hover:from-green-700 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transform hover:-translate-y-0.5 active:translate-y-0 mb-4"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -249,49 +296,86 @@ export default function VerifyOTP() {
                   </svg>
                   Verifying...
                 </span>
-              ) : success ? (
-                'Verified ✓'
               ) : (
                 'Verify Email'
               )}
             </button>
-
-            {/* Resend OTP */}
-            <div className="text-center">
-              <p className="text-sm text-gray-400 mb-2">Didn't receive the code?</p>
-              <button
-                type="button"
-                onClick={handleResendOTP}
-                disabled={resending || timeLeft > 240} // Can resend after 1 minute (60 seconds)
-                className="text-blue-400 hover:text-blue-300 font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
-              >
-                <RefreshCw className={`w-4 h-4 ${resending ? 'animate-spin' : ''}`} />
-                {resending ? 'Sending...' : 'Resend Code'}
-              </button>
-              {timeLeft > 240 && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Available in {formatTime(timeLeft - 240)}
-                </p>
-              )}
-            </div>
           </form>
 
-          {/* Back to Login */}
-          <div className="mt-6 text-center pt-6 border-t border-gray-700">
-            <p className="text-sm text-gray-400">
-              Wrong email?{' '}
-              <Link to="/register" className="text-blue-400 hover:text-blue-300 font-semibold">
-                Register again
-              </Link>
+          {/* Resend OTP Section */}
+          <div className="text-center">
+            <p className="text-slate-400 text-sm mb-3">
+              Didn't receive the code?
             </p>
+
+            <button
+              type="button"
+              onClick={handleResendOTP}
+              disabled={resendLoading || resendCooldown > 0}
+              className="text-indigo-400 hover:text-indigo-300 font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {resendLoading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                  </svg>
+                  Sending...
+                </span>
+              ) : resendCooldown > 0 ? (
+                `Resend in ${resendCooldown}s`
+              ) : (
+                'Resend OTP'
+              )}
+            </button>
+          </div>
+
+          {/* Help Text */}
+          <div className="mt-6 pt-6 border-t border-slate-800">
+            <div className="flex items-start gap-3 text-sm text-slate-500">
+              <svg className="w-4 h-4 text-slate-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p>
+                For security reasons, the OTP will expire in 5 minutes. Make sure to check your spam folder if you don't see the email.
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Security Note */}
-        <p className="text-center text-xs text-gray-500 mt-6">
-          🔒 Never share your verification code with anyone
-        </p>
+        {/* Back to Login */}
+        <div className="text-center mt-6">
+          <p className="text-slate-400">
+            Remember your password?{' '}
+            <Link to="/login" className="font-semibold text-indigo-400 hover:text-indigo-300 transition-colors">
+              Back to Login
+            </Link>
+          </p>
+        </div>
+
+        {/* Security Badge */}
+        <div className="text-center mt-6">
+          <p className="text-sm text-slate-500 flex items-center justify-center gap-2">
+            <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            Secure email verification
+          </p>
+        </div>
       </div>
+
+      {/* Custom Styles */}
+      <style jsx>{`
+        .otp-input::-webkit-outer-spin-button,
+        .otp-input::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+
+        .otp-input {
+          -moz-appearance: textfield;
+        }
+      `}</style>
     </div>
   );
 }

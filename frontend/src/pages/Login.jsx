@@ -17,7 +17,7 @@ export default function Login() {
   });
 
   const navigate = useNavigate();
-  const { login } = useAuth(); // ✅ FIXED: Using AuthContext
+  const { login } = useAuth();
 
   // Fetch real-time market data every 10 seconds
   useEffect(() => {
@@ -74,12 +74,12 @@ export default function Login() {
     try {
       console.log('🔐 Attempting login...');
 
-      // ✅ FIXED: Using AuthContext login instead of direct axios
+      // Using AuthContext login
       const result = await login(email.trim().toLowerCase(), password);
 
       if (result.success) {
-        console.log('✅ Login successful, redirecting to dashboard...');
-        navigate('/dashboard');
+        console.log('✅ Login successful, redirecting to Namaste...');
+        navigate('/namaste'); // ✅ CHANGED: Redirect to Namaste first
       } else if (result.requiresVerification) {
         // Email not verified - redirect to OTP verification
         setRequiresVerification(true);

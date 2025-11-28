@@ -5,6 +5,7 @@ import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import VerifyOTP from './pages/VerifyOTP';
+import Namaste from "./components/RgvNamaste";
 import Dashboard from './pages/Dashboard';
 import Watchlist from './pages/Watchlist';
 import Portfolio from './pages/Portfolio';
@@ -41,12 +42,22 @@ function AppContent() {
     <>
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Landing />} />
-        <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
-        <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <Register />} />
+        <Route path="/" element={user ? <Navigate to="/namaste" /> : <Landing />} /> {/* ✅ UPDATED */}
+        <Route path="/login" element={user ? <Navigate to="/namaste" /> : <Login />} /> {/* ✅ UPDATED */}
+        <Route path="/register" element={user ? <Navigate to="/namaste" /> : <Register />} /> {/* ✅ UPDATED */}
 
-        {/* OTP Verification Route - NEW */}
+        {/* OTP Verification Route */}
         <Route path="/verify-otp" element={<VerifyOTP />} />
+
+        {/* Namaste Splash Page - NEW */}
+        <Route
+          path="/namaste"
+          element={
+            <PrivateRoute>
+              <Namaste />
+            </PrivateRoute>
+          }
+        />
 
         {/* Protected Routes */}
         <Route
