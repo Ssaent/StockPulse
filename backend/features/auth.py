@@ -35,6 +35,39 @@ def validate_email_address(email):
     return None
 
 
+def validate_username(username):
+    """Validate username format - no numbers, no phone number patterns, professional"""
+    username = username.strip()
+
+    # Check length
+    if len(username) < 3:
+        return "Username must be at least 3 characters long"
+    if len(username) > 30:
+        return "Username must be less than 30 characters"
+
+    # Check for only alphabets and optional underscores/hyphens
+    if not re.match(r'^[a-zA-Z][a-zA-Z_-]*[a-zA-Z]$', username):
+        return "Username can only contain letters, hyphens, or underscores (no numbers, no special characters at start/end)"
+
+    # Check for phone number patterns (sequences of 10+ digits)
+    if re.search(r'\d{10,}', username):
+        return "Username cannot contain phone number patterns"
+
+    # Check for common number sequences
+    number_sequences = ['123', '1234', '12345', '000', '111', '222', '333', '444', '555', '666', '777', '888', '999']
+    if any(seq in username for seq in number_sequences):
+        return "Username cannot contain number sequences"
+
+    # Check for inappropriate patterns
+    inappropriate_patterns = [
+        'admin', 'root', 'support', 'help', 'contact', 'service', 'test', 'demo'
+    ]
+    if username.lower() in inappropriate_patterns:
+        return "This username is not allowed"
+
+    return None
+
+
 def validate_password_strength(password):
     """Validate password meets security requirements"""
     errors = []
@@ -60,12 +93,24 @@ def register():
     """Register new user - Send OTP for email verification"""
     try:
         data = request.get_json()
+        print(f"📝 Raw registration data: {data}")  # DEBUG: See what's coming in
 
-        name = data.get('name', '').strip()
-        email = data.get('email', '').strip().lower()
-        password = data.get('password', '')
+        # FIX: Handle the specific nested data structure from frontend
+        # Data is coming as: {'name': {'name': 'SaiTeja', 'email': 'test@email.com', 'username': 'ssae', 'password': 'pass'}}
+        if isinstance(data, dict) and 'name' in data and isinstance(data['name'], dict):
+            # Extract from nested structure
+            name = data['name'].get('name', '').strip()
+            email = data['name'].get('email', '').strip().lower()
+            username = data['name'].get('username', '').strip()
+            password = data['name'].get('password', '')
+        else:
+            # Normal flat data structure
+            name = data.get('name', '').strip()
+            email = data.get('email', '').strip().lower()
+            username = data.get('username', '').strip()
+            password = data.get('password', '')
 
-        print(f"📝 Registration attempt: {email}")
+        print(f"📝 Registration attempt: {email} | Username: {username} | Name: {name}")
 
         # Validate name
         if not name or len(name) < 2:
@@ -76,11 +121,25 @@ def register():
         name = re.sub(r'[<>"\']', '', name)
 
         # Validate email
+        if not email:
+            return jsonify({'error': 'Email is required'}), 400
+
         email_error = validate_email_address(email)
         if email_error:
             return jsonify({'error': email_error}), 400
 
+        # Validate username
+        if not username:
+            return jsonify({'error': 'Username is required'}), 400
+
+        username_error = validate_username(username)
+        if username_error:
+            return jsonify({'error': username_error}), 400
+
         # Validate password
+        if not password:
+            return jsonify({'error': 'Password is required'}), 400
+
         password_errors = validate_password_strength(password)
         if password_errors:
             return jsonify({
@@ -88,10 +147,15 @@ def register():
                 'details': password_errors
             }), 400
 
-        # Check if user exists
+        # Check if email exists
         existing_user = User.query.filter_by(email=email).first()
         if existing_user:
             return jsonify({'error': 'Email already registered'}), 400
+
+        # Check if username exists
+        existing_username = User.query.filter_by(username=username).first()
+        if existing_username:
+            return jsonify({'error': 'Username already taken'}), 400
 
         # Hash password
         hashed_password = bcrypt.generate_password_hash(password, rounds=12).decode('utf-8')
@@ -106,6 +170,7 @@ def register():
         user = User(
             name=name,
             email=email,
+            username=username,  # NEW: Store username
             password_hash=hashed_password,
             is_verified=False,
             verification_otp=otp,
@@ -124,11 +189,12 @@ def register():
             otp=otp
         )
 
-        print(f"✅ User registered: {email} (OTP sent: {email_sent})")
+        print(f"✅ User registered: {email} | Username: {username} (OTP sent: {email_sent})")
 
         return jsonify({
             'message': 'Registration successful! Please check your email for OTP.',
             'email': email,
+            'username': username,
             'otp_sent': email_sent,
             'expires_in': '5 minutes'
         }), 201
@@ -170,6 +236,7 @@ def verify_otp():
                 additional_claims={
                     'email': user.email,
                     'name': user.name,
+                    'username': user.username,  # NEW: Include username in claims
                     'is_verified': True
                 },
                 expires_delta=timedelta(days=7)
@@ -224,12 +291,13 @@ def verify_otp():
             additional_claims={
                 'email': user.email,
                 'name': user.name,
+                'username': user.username,  # NEW: Include username in claims
                 'is_verified': True
             },
             expires_delta=timedelta(days=7)
         )
 
-        print(f"✅ Email verified successfully: {user.email}")
+        print(f"✅ Email verified successfully: {user.email} | Username: {user.username}")
 
         return jsonify({
             'message': 'Email verified successfully! You can now login.',
@@ -238,6 +306,7 @@ def verify_otp():
                 'id': user.id,
                 'email': user.email,
                 'name': user.name,
+                'username': user.username,  # NEW: Include username in response
                 'is_verified': True
             }
         }), 200
@@ -486,12 +555,13 @@ def login():
             additional_claims={
                 'email': user.email,
                 'name': user.name,
+                'username': user.username,  # NEW: Include username in claims
                 'is_verified': user.is_verified
             },
             expires_delta=timedelta(days=7)
         )
 
-        print(f"✅ Login successful: {email}")
+        print(f"✅ Login successful: {email} | Username: {user.username}")
 
         return jsonify({
             'message': 'Login successful',
@@ -500,6 +570,7 @@ def login():
                 'id': user.id,
                 'email': user.email,
                 'name': user.name,
+                'username': user.username,  # NEW: Include username in response
                 'is_verified': user.is_verified
             }
         }), 200
@@ -572,3 +643,56 @@ def change_password():
         db.session.rollback()
         print(f"❌ Change password error: {e}")
         return jsonify({'error': 'Failed to change password'}), 500
+
+
+# ==================== UPDATE PROFILE ====================
+
+@auth_bp.route('/update-profile', methods=['POST'])
+@jwt_required()
+def update_profile():
+    """Update user profile information"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        user = User.query.get(current_user_id)
+
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        data = request.get_json()
+        name = data.get('name', '').strip()
+        username = data.get('username', '').strip()
+
+        # Validate name
+        if name:
+            if len(name) < 2:
+                return jsonify({'error': 'Name must be at least 2 characters'}), 400
+            if len(name) > 100:
+                return jsonify({'error': 'Name is too long'}), 400
+            user.name = re.sub(r'[<>"\']', '', name)
+
+        # Validate and update username
+        if username and username != user.username:
+            username_error = validate_username(username)
+            if username_error:
+                return jsonify({'error': username_error}), 400
+
+            # Check if username is taken
+            existing_user = User.query.filter_by(username=username).first()
+            if existing_user and existing_user.id != user.id:
+                return jsonify({'error': 'Username already taken'}), 400
+
+            user.username = username
+
+        db.session.commit()
+
+        print(f"✅ Profile updated: {user.email} | Username: {user.username}")
+
+        return jsonify({
+            'message': 'Profile updated successfully',
+            'user': user.to_dict()
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Profile update error: {e}")
+        return jsonify({'error': 'Failed to update profile'}), 500

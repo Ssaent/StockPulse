@@ -299,9 +299,9 @@ export default function Dashboard() {
       </header>
 
       <div className="container mx-auto px-6 py-8">
-        {/* Welcome */}
+        {/* Welcome - FIXED: Use username instead of email */}
         <div className="mb-8">
-          <h2 className="text-3xl font-bold mb-2">Welcome back, {user?.name || user?.email}!</h2>
+          <h2 className="text-3xl font-bold mb-2">Welcome back, {user?.username || user?.name}!</h2>
           <p className="text-gray-400">Search and analyze stocks with AI-powered predictions</p>
         </div>
 

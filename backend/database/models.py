@@ -18,6 +18,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
+    username = db.Column(db.String(50), unique=True, nullable=False, index=True)  # NEW: Username field
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     last_login = db.Column(db.DateTime)
@@ -46,13 +47,14 @@ class User(db.Model):
             'id': self.id,
             'name': self.name,
             'email': self.email,
+            'username': self.username,  # NEW: Include username in response
             'is_verified': self.is_verified,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_login': self.last_login.isoformat() if self.last_login else None
         }
 
     def __repr__(self):
-        return f'<User {self.email}>'
+        return f'<User {self.email} ({self.username})>'
 
 
 # ============================================================
@@ -170,13 +172,13 @@ class SearchHistory(db.Model):
     def to_dict(self):
         return {
             'id': self.id,
-            'symbol': self.symbol,
-            'exchange': self.exchange,
-            'searched_at': self.searched_at.isoformat()
+            'symbol': this.symbol,
+            'exchange': this.exchange,
+            'searched_at': this.searched_at.isoformat()
         }
 
     def __repr__(self):
-        return f'<SearchHistory {self.symbol}>'
+        return f'<SearchHistory {this.symbol}>'
 
 
 # ============================================================
@@ -219,30 +221,30 @@ class PredictionLog(db.Model):
 
     def to_dict(self):
         return {
-            'id': self.id,
-            'symbol': self.symbol,
-            'exchange': self.exchange,
-            'prediction_date': self.prediction_date.isoformat(),
-            'timeframe': self.timeframe,
-            'predicted_price': self.predicted_price,
-            'predicted_change_pct': self.predicted_change_pct,
-            'confidence': self.confidence,
-            'current_price_at_prediction': self.current_price_at_prediction,
-            'target_date': self.target_date.isoformat() if self.target_date else None,
-            'actual_price': self.actual_price,
-            'actual_change_pct': self.actual_change_pct,
-            'is_accurate': self.is_accurate,
-            'accuracy_pct': self.accuracy_pct,
-            'profit_if_followed': self.profit_if_followed,
-            'profit_loss_pct': self.profit_loss_pct,
-            'is_validated': self.is_validated,
-            'validated_at': self.validated_at.isoformat() if self.validated_at else None,
-            'model_version': self.model_version,
-            'features_used': self.features_used
+            'id': this.id,
+            'symbol': this.symbol,
+            'exchange': this.exchange,
+            'prediction_date': this.prediction_date.isoformat(),
+            'timeframe': this.timeframe,
+            'predicted_price': this.predicted_price,
+            'predicted_change_pct': this.predicted_change_pct,
+            'confidence': this.confidence,
+            'current_price_at_prediction': this.current_price_at_prediction,
+            'target_date': this.target_date.isoformat() if this.target_date else None,
+            'actual_price': this.actual_price,
+            'actual_change_pct': this.actual_change_pct,
+            'is_accurate': this.is_accurate,
+            'accuracy_pct': this.accuracy_pct,
+            'profit_if_followed': this.profit_if_followed,
+            'profit_loss_pct': this.profit_loss_pct,
+            'is_validated': this.is_validated,
+            'validated_at': this.validated_at.isoformat() if this.validated_at else None,
+            'model_version': this.model_version,
+            'features_used': this.features_used
         }
 
     def __repr__(self):
-        return f'<PredictionLog {self.symbol} {self.timeframe} {self.prediction_date}>'
+        return f'<PredictionLog {this.symbol} {this.timeframe} {this.prediction_date}>'
 
 
 # ============================================================
@@ -265,19 +267,19 @@ class AnalysisHistory(db.Model):
 
     def to_dict(self):
         return {
-            'id': self.id,
-            'user_id': self.user_id,
-            'symbol': self.symbol,
-            'name': self.name,
-            'exchange': self.exchange,
-            'analyzed_at': self.analyzed_at.isoformat(),
-            'currentPrice': self.current_price,
-            'predictions': self.predictions,
-            'technical': self.technical
+            'id': this.id,
+            'user_id': this.user_id,
+            'symbol': this.symbol,
+            'name': this.name,
+            'exchange': this.exchange,
+            'analyzed_at': this.analyzed_at.isoformat(),
+            'currentPrice': this.current_price,
+            'predictions': this.predictions,
+            'technical': this.technical
         }
 
     def __repr__(self):
-        return f'<AnalysisHistory {self.symbol} by user {self.user_id} at {self.analyzed_at}>'
+        return f'<AnalysisHistory {this.symbol} by user {this.user_id} at {this.analyzed_at}>'
 
 
 # ============================================================
@@ -290,7 +292,7 @@ class ChatMessage(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
-    username = db.Column(db.String(100), nullable=False)
+    username = db.Column(db.String(100), nullable=False)  # Now uses username instead of email
     content = db.Column(db.Text, nullable=False)
     message_type = db.Column(db.String(20), default='text')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), index=True)
@@ -302,17 +304,17 @@ class ChatMessage(db.Model):
 
     def to_dict(self):
         return {
-            'id': self.id,
-            'user_id': self.user_id,
-            'username': self.username,
-            'content': self.content,
-            'type': self.message_type,
-            'created_at': self.created_at.isoformat(),
-            'reactions': [r.to_dict() for r in self.reactions]
+            'id': this.id,
+            'user_id': this.user_id,
+            'username': this.username,
+            'content': this.content,
+            'type': this.message_type,
+            'created_at': this.created_at.isoformat(),
+            'reactions': [r.to_dict() for r in this.reactions]
         }
 
     def __repr__(self):
-        return f'<ChatMessage {self.id} by {self.username}>'
+        return f'<ChatMessage {this.id} by {this.username}>'
 
 
 class MessageReaction(db.Model):
@@ -329,13 +331,13 @@ class MessageReaction(db.Model):
 
     def to_dict(self):
         return {
-            'emoji': self.emoji,
-            'user_id': self.user_id,
+            'emoji': this.emoji,
+            'user_id': this.user_id,
             'count': 1
         }
 
     def __repr__(self):
-        return f'<MessageReaction {self.emoji}>'
+        return f'<MessageReaction {this.emoji}>'
 
 
 class OnlineUser(db.Model):
@@ -349,9 +351,9 @@ class OnlineUser(db.Model):
 
     def to_dict(self):
         return {
-            'user_id': self.user_id,
-            'last_seen': self.last_seen.isoformat()
+            'user_id': this.user_id,
+            'last_seen': this.last_seen.isoformat()
         }
 
     def __repr__(self):
-        return f'<OnlineUser {self.user_id}>'
+        return f'<OnlineUser {this.user_id}>'

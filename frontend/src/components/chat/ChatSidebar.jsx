@@ -147,6 +147,7 @@ export default function ChatSidebar({ isOpen, onClose }) {
                 className="bg-white/5 border border-white/10 rounded-xl p-3 hover:bg-white/10 transition"
               >
                 <div className="flex items-center justify-between mb-2">
+                  {/* FIXED: Username is already used from backend, no change needed */}
                   <span className="font-semibold text-indigo-400 text-sm">
                     {msg.username}
                   </span>

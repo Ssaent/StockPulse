@@ -16,15 +16,21 @@ export default function VerifyOTP() {
   const location = useLocation();
   const { verifyOTP, resendOTP } = useAuth();
 
-  // Get email from navigation state or prompt user
+  // Get email and username from navigation state
   useEffect(() => {
     const stateEmail = location.state?.email;
+    const stateUsername = location.state?.username; // NEW: Get username from state
 
     if (stateEmail) {
       setEmail(stateEmail);
-      // Extract name from email for greeting
-      const nameFromEmail = stateEmail.split('@')[0];
-      setUserName(nameFromEmail.charAt(0).toUpperCase() + nameFromEmail.slice(1));
+      // FIXED: Use provided username or fallback to name from email
+      if (stateUsername) {
+        setUserName(stateUsername);
+      } else {
+        // Fallback: extract name from email
+        const nameFromEmail = stateEmail.split('@')[0];
+        setUserName(nameFromEmail.charAt(0).toUpperCase() + nameFromEmail.slice(1));
+      }
     } else {
       // If no email in state, try to get from localStorage or prompt
       const storedEmail = localStorage.getItem('pendingVerificationEmail');
@@ -212,7 +218,7 @@ export default function VerifyOTP() {
 
             {userName && (
               <p className="text-lg text-slate-300 mb-1">
-                Hello, <span className="font-semibold text-emerald-400">{userName}</span>! 👋
+                Welcome, <span className="font-semibold text-emerald-400">{userName}</span>! 👋
               </p>
             )}
 
