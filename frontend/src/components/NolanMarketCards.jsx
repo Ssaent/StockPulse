@@ -173,13 +173,13 @@ const NolanMarketCards = () => {
     return () => clearInterval(age);
   }, []);
 
-  // Dynamic refresh policy:
-  // - Open: 10s
-  // - Closed: 1h (status check)
+  // ✅ UPDATED: Real-time refresh policy:
+  // - Open: 3 seconds (ultra real-time)
+  // - Closed: 30 seconds (frequent status checks)
   useEffect(() => {
     if (refreshRef.current) clearInterval(refreshRef.current);
 
-    const intervalMs = isMarketOpen ? 10_000 : 3_600_000;
+    const intervalMs = isMarketOpen ? 3_000 : 30_000; // 3s when open, 30s when closed
     refreshRef.current = setInterval(() => {
       fetchMarketData();
     }, intervalMs);
@@ -357,7 +357,7 @@ const NolanMarketCards = () => {
         </div>
         <div className="mt-4 text-[12px] text-gray-400/70 font-mono">Updated {dataAge}s ago</div>
         <div className="mt-1 text-[11px] text-gray-500/80">
-          Refresh: {isOpen ? 'every 10s (live)' : 'every 1h (status check)'}
+          Refresh: {isOpen ? 'every 3s (live)' : 'every 30s (status check)'}
         </div>
       </RgvShell>
     );
