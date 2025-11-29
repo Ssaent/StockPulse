@@ -1,67 +1,114 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import io from 'socket.io-client';
+import { useAuth } from '../context/AuthContext';
 
-export function useWebSocketChat(token) {
+export function useWebSocketChat() {
   const [socket, setSocket] = useState(null);
   const [messages, setMessages] = useState([]);
   const [onlineCount, setOnlineCount] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
   const [typingUsers, setTypingUsers] = useState(new Set());
+  const [authError, setAuthError] = useState('');
 
+  const { user } = useAuth();
   const typingTimeoutRef = useRef({});
 
-  useEffect(() => {
-    if (!token) return;
+  // Get token from localStorage directly to ensure it's fresh
+  const getToken = () => {
+    return localStorage.getItem('token');
+  };
 
-    console.log('🔌 Connecting to WebSocket...');
+  useEffect(() => {
+    const token = getToken();
+
+    if (!token || !user) {
+      console.log('🔌 WebSocket: No token or user, skipping connection');
+      if (socket) {
+        socket.close();
+        setSocket(null);
+      }
+      return;
+    }
+
+    console.log('🔌 Connecting to WebSocket with token:', token ? 'Present' : 'Missing');
 
     const newSocket = io('http://localhost:5000', {
-      auth: { token },
+      auth: {
+        token: token,
+        userId: user.id
+      },
       transports: ['websocket', 'polling'],
       reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
+      forceNew: true
     });
 
     newSocket.on('connect', () => {
-      console.log('✅ WebSocket connected!');
+      console.log('✅ WebSocket connected! Socket ID:', newSocket.id);
       setIsConnected(true);
+      setAuthError('');
       newSocket.emit('get_history', { limit: 100 });
     });
 
     newSocket.on('connect_error', (error) => {
-      console.error('❌ Connection error:', error.message);
+      console.error('❌ WebSocket connection error:', error.message);
       setIsConnected(false);
+
+      // Handle authentication errors specifically
+      if (error.message.includes('auth') || error.message.includes('401') || error.message.includes('403')) {
+        setAuthError('Authentication failed. Please log in again.');
+        console.error('🔐 Auth error - clearing token');
+        localStorage.removeItem('token');
+      }
     });
 
     newSocket.on('disconnect', (reason) => {
-      console.log('⚠️ Disconnected:', reason);
+      console.log('⚠️ WebSocket disconnected:', reason);
+      setIsConnected(false);
+
+      // Auto-reconnect on network errors
+      if (reason === 'io server disconnect' || reason === 'transport close') {
+        console.log('🔄 Attempting to reconnect...');
+        setTimeout(() => {
+          if (getToken()) {
+            newSocket.connect();
+          }
+        }, 2000);
+      }
+    });
+
+    newSocket.on('auth_error', (data) => {
+      console.error('🔐 Server auth error:', data.message);
+      setAuthError(data.message || 'Authentication failed');
       setIsConnected(false);
     });
 
     newSocket.on('chat_history', (data) => {
-      console.log(`📜 Loaded ${data.messages.length} messages`);
-      setMessages(data.messages);
+      console.log(`📜 Loaded ${data.messages?.length || 0} messages`);
+      setMessages(data.messages || []);
     });
 
     newSocket.on('new_message', (message) => {
-      console.log('📨 New message:', message.username);
+      console.log('📨 New message from:', message.username);
       setMessages(prev => [...prev, message]);
     });
 
     newSocket.on('online_count', (data) => {
-      console.log(`👥 Online: ${data.count}`);
-      setOnlineCount(data.count);
+      console.log(`👥 Online users: ${data.count}`);
+      setOnlineCount(data.count || 0);
     });
 
     newSocket.on('user_joined', (data) => {
-      console.log(`✅ ${data.username} joined`);
-      setOnlineCount(data.online_count);
+      console.log(`✅ ${data.username} joined the chat`);
+      setOnlineCount(data.online_count || 0);
     });
 
     newSocket.on('user_left', (data) => {
-      console.log(`❌ ${data.username} left`);
-      setOnlineCount(data.online_count);
+      console.log(`❌ ${data.username} left the chat`);
+      setOnlineCount(data.online_count || 0);
     });
 
     newSocket.on('user_typing', (data) => {
@@ -90,22 +137,40 @@ export function useWebSocketChat(token) {
 
     newSocket.on('error', (data) => {
       console.error('⚠️ Server error:', data.message);
-      alert(data.message);
+      setAuthError(data.message || 'Connection error');
     });
 
     setSocket(newSocket);
 
     return () => {
-      console.log('🔌 Disconnecting WebSocket...');
+      console.log('🔌 Cleaning up WebSocket connection');
       Object.values(typingTimeoutRef.current).forEach(clearTimeout);
-      newSocket.close();
+      if (newSocket) {
+        newSocket.removeAllListeners();
+        newSocket.close();
+      }
     };
-  }, [token]);
+  }, [user]);
 
   const sendMessage = useCallback((content) => {
-    if (socket && isConnected && content.trim()) {
-      socket.emit('send_message', { content: content.trim() });
+    const token = getToken();
+
+    if (!socket || !isConnected) {
+      setAuthError('Not connected to chat. Please refresh the page.');
+      return false;
     }
+
+    if (!token) {
+      setAuthError('Not authenticated. Please log in again.');
+      return false;
+    }
+
+    if (content.trim()) {
+      socket.emit('send_message', { content: content.trim() });
+      return true;
+    }
+
+    return false;
   }, [socket, isConnected]);
 
   const sendTyping = useCallback((isTyping) => {
@@ -114,12 +179,22 @@ export function useWebSocketChat(token) {
     }
   }, [socket, isConnected]);
 
+  // Add reconnection function
+  const reconnect = useCallback(() => {
+    if (socket) {
+      socket.connect();
+    }
+  }, [socket]);
+
   return {
     messages,
     onlineCount,
     sendMessage,
     sendTyping,
     isConnected,
+    authError,
+    setAuthError,
+    reconnect,
     typingUsers: Array.from(typingUsers),
     socket
   };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { TrendingUp, TrendingDown, Activity, BarChart3 } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, BarChart3, Loader2 } from 'lucide-react';
 
 /* ----------
    Helpers
@@ -102,6 +102,7 @@ const NolanMarketCards = () => {
   });
   const [dataAge, setDataAge] = useState(0);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // ✅ ADDED: Loading state
 
   const isMarketOpen = marketData.status === 'Open';
   const refreshRef = useRef(null);
@@ -157,6 +158,7 @@ const NolanMarketCards = () => {
       }
     } finally {
       setIsUpdating(false);
+      setIsLoading(false); // ✅ ADDED: Stop loading when done
     }
   };
 
@@ -189,6 +191,52 @@ const NolanMarketCards = () => {
 
   const MarketCard = ({ title, value, change, changePercent, icon: Icon, neon = '239,68,68' }) => {
     const isPositive = change >= 0;
+
+    // ✅ ADDED: Show loading state
+    if (isLoading) {
+      return (
+        <RgvShell>
+          <div className="relative">
+            <div className="flex items-start justify-between mb-5">
+              <div>
+                <div className="text-[13px] uppercase tracking-[1px] text-gray-400/80 mb-2">{title}</div>
+                <div className="text-white text-[36px] font-bold leading-[1.2] tracking-[-.02em] drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)] animate-pulse">
+                  --
+                </div>
+              </div>
+              <div
+                className="w-14 h-14 rounded-xl flex items-center justify-center border animate-pulse"
+                style={{
+                  background: `rgba(${neon}, 0.1)`,
+                  borderColor: `rgba(${neon}, 0.2)`,
+                }}
+              >
+                <Loader2 size={28} className="animate-spin" style={{ color: `rgb(${neon})` }} />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 mt-2">
+              <div
+                className="flex items-center gap-1.5 px-3 py-2 rounded-md border animate-pulse"
+                style={{
+                  background: 'rgba(100,100,100,0.12)',
+                  borderColor: 'rgba(100,100,100,0.32)',
+                }}
+              >
+                <div className="w-4 h-4 bg-gray-500 rounded"></div>
+                <span className="font-semibold text-[15px] font-mono text-gray-500">
+                  --%
+                </span>
+              </div>
+              <div className="text-[13px] text-gray-400/80 font-medium font-mono animate-pulse">
+                --
+              </div>
+            </div>
+          </div>
+        </RgvShell>
+      );
+    }
+
     return (
       <RgvShell>
         <div className="relative">
@@ -252,6 +300,33 @@ const NolanMarketCards = () => {
 
   const StatusCard = () => {
     const isOpen = isMarketOpen;
+
+    // ✅ ADDED: Show loading state
+    if (isLoading) {
+      return (
+        <RgvShell>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-[13px] uppercase tracking-[1px] text-gray-400/80 mb-2">Market Status</div>
+              <div className="text-[36px] font-bold animate-pulse text-gray-500">
+                --
+              </div>
+            </div>
+            <div
+              className="w-14 h-14 rounded-xl flex items-center justify-center border animate-pulse"
+              style={{
+                background: 'rgba(100,100,100,0.1)',
+                borderColor: 'rgba(100,100,100,0.2)',
+              }}
+            >
+              <Loader2 size={28} className="animate-spin text-gray-500" />
+            </div>
+          </div>
+          <div className="mt-4 text-[12px] text-gray-400/70 font-mono animate-pulse">Loading...</div>
+        </RgvShell>
+      );
+    }
+
     return (
       <RgvShell>
         <div className="flex items-center justify-between">

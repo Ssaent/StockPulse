@@ -94,11 +94,21 @@ export default function Dashboard() {
   const mountedRef = useRef(true);
   const resultsBoxRef = useRef(null);
 
+  // ✅ ADDED: Market data loading state
+  const [isMarketDataLoading, setIsMarketDataLoading] = useState(true);
+
   useEffect(() => {
     mountedRef.current = true;
+
+    // ✅ ADDED: Set market data loading to false after initial load
+    const timer = setTimeout(() => {
+      setIsMarketDataLoading(false);
+    }, 500);
+
     return () => {
       mountedRef.current = false;
       if (abortRef.current) abortRef.current.abort();
+      clearTimeout(timer);
     };
   }, []);
 
@@ -228,7 +238,6 @@ export default function Dashboard() {
       { to: '/alerts', icon: Bell, label: 'Alerts' },
       { to: '/watchlist', icon: Star, label: 'Watchlist' },
       { to: '/portfolio', icon: Briefcase, label: 'Portfolio' },
-      { to: '/chat', icon: MessageSquare, label: 'Chat' },
     ],
     []
   );
@@ -292,13 +301,23 @@ export default function Dashboard() {
       <div className="container mx-auto px-6 py-8">
         {/* Welcome */}
         <div className="mb-8">
-          <h2 className="text-3xl font-bold mb-2">Welcome back, {user?.email}!</h2>
+          <h2 className="text-3xl font-bold mb-2">Welcome back, {user?.name || user?.email}!</h2>
           <p className="text-gray-400">Search and analyze stocks with AI-powered predictions</p>
         </div>
 
         {/* Quick Stats - RGV/Nolan Hybrid */}
         <div className="mb-8">
-          <NolanMarketCards />
+          {/* ✅ ADDED: Loading state for market data */}
+          {isMarketDataLoading ? (
+            <RgvPanel>
+              <div className="flex items-center justify-center space-x-4">
+                <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
+                <span className="text-gray-400">Loading market data...</span>
+              </div>
+            </RgvPanel>
+          ) : (
+            <NolanMarketCards />
+          )}
         </div>
 
         {/* Search + Popular */}
@@ -608,6 +627,47 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* ✅ ADDED: Custom CSS for animations */}
+      <style jsx>{`
+        @keyframes candleFloat {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-5px); }
+        }
+        @keyframes wickPulse {
+          0%, 100% { opacity: 0.6; }
+          50% { opacity: 1; }
+        }
+        @keyframes bodyPulse {
+          0%, 100% { transform: scaleY(1); }
+          50% { transform: scaleY(1.1); }
+        }
+        @keyframes lineDraw {
+          0% { stroke-dasharray: 1000; stroke-dashoffset: 1000; }
+          100% { stroke-dasharray: 1000; stroke-dashoffset: 0; }
+        }
+        @keyframes pulseDot {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.5); opacity: 0.7; }
+        }
+        @keyframes progressMove {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        @keyframes floatUp {
+          0% { transform: translateY(0); opacity: 1; }
+          100% { transform: translateY(-30px); opacity: 0; }
+        }
+
+        .candle-float { animation: candleFloat 2s ease-in-out infinite; }
+        .wick-pulse { animation: wickPulse 1.5s ease-in-out infinite; }
+        .wick-pulse-reverse { animation: wickPulse 1.5s ease-in-out infinite reverse; }
+        .body-pulse { animation: bodyPulse 2s ease-in-out infinite; }
+        .line-draw { animation: lineDraw 3s ease-in-out forwards; }
+        .pulse-dot { animation: pulseDot 2s ease-in-out infinite; }
+        .progress-move { animation: progressMove 2s ease-in-out infinite; }
+        .float-up { animation: floatUp 2s ease-in-out infinite; }
+      `}</style>
     </div>
   );
 }

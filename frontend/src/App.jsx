@@ -38,17 +38,16 @@ function AppContent() {
   const { user } = useAuth();
   const [chatOpen, setChatOpen] = useState(false);
 
-  // Get token and online count for the toggle button
-  const token = localStorage.getItem('token');
-  const { onlineCount } = useWebSocketChat(token);
+  // ✅ UPDATED: Remove token parameter - hook now handles authentication internally
+  const { onlineCount } = useWebSocketChat();
 
   return (
     <>
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={user ? <Navigate to="/namaste" /> : <Landing />} /> {/* ✅ UPDATED */}
-        <Route path="/login" element={user ? <Navigate to="/namaste" /> : <Login />} /> {/* ✅ UPDATED */}
-        <Route path="/register" element={user ? <Navigate to="/namaste" /> : <Register />} /> {/* ✅ UPDATED */}
+        <Route path="/" element={user ? <Navigate to="/namaste" /> : <Landing />} />
+        <Route path="/login" element={user ? <Navigate to="/namaste" /> : <Login />} />
+        <Route path="/register" element={user ? <Navigate to="/namaste" /> : <Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
@@ -57,7 +56,7 @@ function AppContent() {
         {/* OTP Verification Route */}
         <Route path="/verify-otp" element={<VerifyOTP />} />
 
-        {/* Namaste Splash Page - NEW */}
+        {/* Namaste Splash Page */}
         <Route
           path="/namaste"
           element={
