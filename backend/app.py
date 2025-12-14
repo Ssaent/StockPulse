@@ -1,21 +1,51 @@
 ﻿"""
-StockPulse Backend - Complete with WebSocket Real-Time Chat
+StockPulse Backend - Production-Ready Implementation
+Industry-standard Flask application with proper logging and error handling
 """
-
+import os
+import sys
+import logging
+from logging.handlers import RotatingFileHandler
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
 from flask_bcrypt import Bcrypt
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-
+from datetime import datetime, timezone, timedelta
 import pandas as pd
-import os
-import sys
-from datetime import datetime, timedelta
 
 # Fix path before imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# Configure logging BEFORE other imports
+def setup_logging(app):
+    """Configure application logging"""
+    log_level = getattr(logging, app.config.get('LOG_LEVEL', 'INFO').upper(), logging.INFO)
+    log_file = app.config.get('LOG_FILE')
+    
+    # Configure root logger
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    # File handler if log file specified
+    if log_file:
+        os.makedirs(os.path.dirname(log_file) if os.path.dirname(log_file) else '.', exist_ok=True)
+        file_handler = RotatingFileHandler(
+            log_file,
+            maxBytes=10485760,  # 10MB
+            backupCount=10
+        )
+        file_handler.setLevel(log_level)
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+        ))
+        logging.getLogger().addHandler(file_handler)
+    
+    return logging.getLogger(__name__)
 
 # Initialize chat flags
 CHAT_ENABLED = False
@@ -25,11 +55,14 @@ init_socketio = None
 
 # Try flexible imports
 try:
-    from backend.config import config
+    # Try importing from project root (when running from backend/)
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    
+    from backend.config import get_config
     from backend.services.backtesting_service import BacktestingEngine
     from backend.services.news_fetcher import StockNewsFetcher
     from backend.services.corporate_actions import CorporateActionsTracker
-    from backend.database.models import db, AnalysisHistory  # ✅ IMPORT AnalysisHistory
+    from backend.database.models import db, AnalysisHistory
     from backend.features.auth import auth_bp, jwt, bcrypt as blueprint_bcrypt
     from backend.features.watchlist import watchlist_bp
     from backend.features.alerts import alerts_bp
@@ -42,27 +75,28 @@ try:
     from backend.ai_engine.feature_engineer import FeatureEngineer
     from backend.utils.cache import cached
 
-    # Chat imports - try both with and without socketio
+    # Chat imports
     try:
         from backend.chat.chat_routes import chat_bp
         CHAT_ENABLED = True
-        print("Chat REST API loaded")
         try:
             from backend.chat.chat_socketio import init_socketio
             WEBSOCKET_ENABLED = True
-            print("WebSocket module loaded")
-        except ImportError as e:
-            print(f"WebSocket not available: {e}")
-    except ImportError as e:
-        print(f"Chat module not found: {e}")
+        except ImportError:
+            WEBSOCKET_ENABLED = False
+    except ImportError:
+        CHAT_ENABLED = False
+        WEBSOCKET_ENABLED = False
 
-except ImportError:
-    # Fallback: running from backend directory
-    from config import config
+except ImportError as e:
+    # Fallback: running from backend directory directly
+    print(f"Warning: Import failed, trying fallback: {e}")
+    
+    from config import get_config
     from services.backtesting_service import BacktestingEngine
     from services.news_fetcher import StockNewsFetcher
     from services.corporate_actions import CorporateActionsTracker
-    from database.models import db, AnalysisHistory  # ✅ IMPORT AnalysisHistory
+    from database.models import db, AnalysisHistory
     from features.auth import auth_bp, jwt, bcrypt as blueprint_bcrypt
     from features.watchlist import watchlist_bp
     from features.alerts import alerts_bp
@@ -75,57 +109,69 @@ except ImportError:
     from ai_engine.feature_engineer import FeatureEngineer
     from utils.cache import cached
 
-    # Chat imports - try both with and without socketio
     try:
         from chat.chat_routes import chat_bp
         CHAT_ENABLED = True
-        print("Chat REST API loaded")
         try:
             from chat.chat_socketio import init_socketio
             WEBSOCKET_ENABLED = True
-            print("WebSocket module loaded")
-        except ImportError as e:
-            print(f"WebSocket not available: {e}")
-    except ImportError as e:
-        print(f"Chat module not found: {e}")
+        except ImportError:
+            WEBSOCKET_ENABLED = False
+    except ImportError:
+        CHAT_ENABLED = False
+        WEBSOCKET_ENABLED = False
 
 
-def create_app(config_name='development'):
+def create_app(config_name=None):
+    """Application factory pattern - industry standard"""
     app = Flask(__name__)
-    app.config.from_object(config[config_name])
-
-    # JWT Secret Key
-    app.config['JWT_SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
-
-    # Initialize Rate Limiter with VERY HIGH default limits for development
+    
+    # Get configuration
+    if config_name is None:
+        config_name = os.getenv('FLASK_ENV', 'development')
+    
+    config_class = get_config()
+    app.config.from_object(config_class)
+    
+    # Setup logging
+    logger = setup_logging(app)
+    logger.info(f"Starting StockPulse in {config_name} mode")
+    
+    # JWT Configuration
+    app.config['JWT_SECRET_KEY'] = config_class.JWT_SECRET_KEY
+    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)
+    
+    # Initialize Rate Limiter with environment-based limits
+    rate_limit_default = config_class.RATE_LIMIT_DEFAULT.split(', ')
     limiter = Limiter(
         app=app,
         key_func=get_remote_address,
-        default_limits=["50000 per day", "10000 per hour"],  # Very high limits for dev
-        storage_uri="memory://",
-        headers_enabled=True
+        default_limits=rate_limit_default,
+        storage_uri=config_class.REDIS_URL if 'redis://' in config_class.REDIS_URL else "memory://",
+        headers_enabled=True,
+        strategy="fixed-window"
     )
-    print("Rate limiter initialized successfully")
+    logger.info("Rate limiter initialized")
 
     # Initialize extensions
     db.init_app(app)
-
+    
     try:
         blueprint_bcrypt.init_app(app)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Bcrypt initialization warning: {e}")
 
     try:
         jwt.init_app(app)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"JWT initialization failed: {e}")
 
-    # CORS - Updated for better compatibility
+    # CORS - Environment-based origins
     CORS(
         app,
         resources={
             r"/api/*": {
-                "origins": ["http://localhost:5173", "http://127.0.0.1:5173"],
+                "origins": config_class.CORS_ORIGINS,
                 "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
                 "allow_headers": ["Content-Type", "Authorization"],
                 "expose_headers": ["Authorization"],
@@ -142,40 +188,36 @@ def create_app(config_name='development'):
     app.register_blueprint(portfolio_bp, url_prefix='/api/portfolio')
     app.register_blueprint(market_bp, url_prefix='/api/market')
 
-    # Register chat blueprint if available (REST API fallback)
+    # Register chat blueprint
     if CHAT_ENABLED and chat_bp is not None:
         app.register_blueprint(chat_bp, url_prefix='/api/chat')
         limiter.exempt(chat_bp)
-        print("Chat REST API enabled (fallback for non-WebSocket clients)")
+        logger.info("Chat REST API enabled")
 
     # Initialize WebSocket chat
     socketio_instance = None
     if WEBSOCKET_ENABLED and init_socketio is not None:
         try:
             socketio_instance = init_socketio(app)
-            print("WebSocket real-time chat enabled (supports 10,000+ users)")
+            logger.info("WebSocket real-time chat enabled")
         except Exception as e:
-            print(f"WebSocket initialization failed: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"WebSocket initialization failed: {e}", exc_info=True)
             socketio_instance = None
 
-    # Apply rate limiting to specific routes (chat is already exempted)
-    @app.before_request
-    def apply_rate_limiting():
-        """Apply rate limiting based on endpoint"""
-        endpoint = request.endpoint
+    # Global error handlers
+    @app.errorhandler(404)
+    def not_found(error):
+        return jsonify({'error': 'Resource not found'}), 404
 
-        if endpoint:
-            # Auth endpoints - increased limits
-            if 'auth.login' in endpoint:
-                limiter.limit("20 per minute")(lambda: None)()
-            elif 'auth.register' in endpoint:
-                limiter.limit("10 per hour")(lambda: None)()
+    @app.errorhandler(500)
+    def internal_error(error):
+        db.session.rollback()
+        logger.error(f"Internal server error: {error}", exc_info=True)
+        return jsonify({'error': 'Internal server error'}), 500
 
-            # API endpoints - moderate limits
-            elif any(prefix in endpoint for prefix in ['watchlist.', 'portfolio.', 'alerts.']):
-                limiter.limit("100 per minute")(lambda: None)()
+    @app.errorhandler(429)
+    def ratelimit_handler(e):
+        return jsonify({'error': 'Rate limit exceeded', 'retry_after': e.description}), 429
 
     # Initialize modules
     stock_fetcher = LiveStockFetcher()
@@ -191,34 +233,62 @@ def create_app(config_name='development'):
 
     @app.route('/api/health')
     def health():
+        """Health check endpoint"""
+        try:
+            # Check database connectivity
+            db.session.execute(db.text('SELECT 1'))
+            db_status = 'ok'
+        except Exception:
+            db_status = 'error'
+        
         return jsonify({
             'status': 'online',
             'app': 'StockPulse',
             'version': '3.0.0',
+            'database': db_status,
             'chat_enabled': CHAT_ENABLED,
-            'websocket_enabled': socketio_instance is not None
+            'websocket_enabled': socketio_instance is not None,
+            'environment': config_name
         })
 
     @app.route('/api/stocks/list/<exchange>')
     @limiter.limit("30 per minute")
     def get_stocks(exchange):
-        stocks = stock_fetcher.fetch_nse_stocks() if exchange.upper() == 'NSE' else stock_fetcher.fetch_bse_stocks()
-        return jsonify({'exchange': exchange, 'total': len(stocks), 'stocks': stocks})
+        """Get stock list by exchange"""
+        try:
+            exchange_upper = exchange.upper()
+            if exchange_upper == 'NSE':
+                stocks = stock_fetcher.fetch_nse_stocks()
+            elif exchange_upper == 'BSE':
+                stocks = stock_fetcher.fetch_bse_stocks()
+            else:
+                return jsonify({'error': 'Invalid exchange'}), 400
+            
+            return jsonify({'exchange': exchange_upper, 'total': len(stocks), 'stocks': stocks})
+        except Exception as e:
+            logger.error(f"Error fetching stocks: {e}", exc_info=True)
+            return jsonify({'error': 'Failed to fetch stocks'}), 500
 
     @app.route('/api/stocks/search')
     @limiter.limit("60 per minute")
     def search_stocks():
-        query = request.args.get('q', '')
-        exchange = request.args.get('exchange', 'NSE')
+        """Search stocks"""
+        try:
+            query = request.args.get('q', '').strip()
+            exchange = request.args.get('exchange', 'NSE').upper()
 
-        if len(query) < 2:
-            return jsonify({'results': []})
+            if len(query) < 2:
+                return jsonify({'results': []})
 
-        results = stock_fetcher.search_stock(query, exchange)
-        return jsonify({'results': results})
+            results = stock_fetcher.search_stock(query, exchange)
+            return jsonify({'results': results})
+        except Exception as e:
+            logger.error(f"Error searching stocks: {e}", exc_info=True)
+            return jsonify({'error': 'Search failed'}), 500
 
     @cached(ttl=300)
     def get_cached_analysis(symbol, exchange):
+        """Get cached stock analysis"""
         try:
             hist_data = price_fetcher.get_historical_data(symbol, exchange, period='2y')
 
@@ -229,7 +299,7 @@ def create_app(config_name='development'):
             hist_data = hist_data.dropna()
 
             if len(hist_data) < 100:
-                print(f"Insufficient data after feature engineering: {len(hist_data)}")
+                logger.warning(f"Insufficient data for {symbol}: {len(hist_data)} rows")
                 return None
 
             hist_data = tech_analyzer.calculate_indicators(hist_data)
@@ -247,7 +317,7 @@ def create_app(config_name='development'):
                     predictor.train(hist_data, feature_cols, validation_split=0.2)
                     predictor.save_model(symbol)
                 except Exception as e:
-                    print(f"Training failed for {symbol}: {e}")
+                    logger.error(f"Training failed for {symbol}: {e}", exc_info=True)
                     return None
 
             feature_cols = predictor.feature_names
@@ -283,104 +353,132 @@ def create_app(config_name='development'):
             }
 
         except Exception as e:
-            print(f"Analysis error for {symbol}: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"Analysis error for {symbol}: {e}", exc_info=True)
             return None
 
     @app.route('/api/analyze', methods=['POST'])
     @limiter.limit("10 per minute")
     @jwt_required()
     def analyze_stock_body():
-        data = request.json
-        symbol = data.get('symbol')
-        exchange = data.get('exchange', 'NSE')
+        """Analyze stock via POST"""
+        try:
+            data = request.json
+            if not data:
+                return jsonify({'error': 'Invalid request'}), 400
+            
+            symbol = data.get('symbol', '').strip().upper()
+            exchange = data.get('exchange', 'NSE').upper()
 
-        result = get_cached_analysis(symbol, exchange)
-        if result:
-            try:
-                backtesting.log_prediction(
-                    symbol=symbol,
-                    exchange=exchange,
-                    predictions=result['predictions'],
-                    current_price=result['currentPrice'],
-                    model_info={'features_used': result.get('features_used', 28)}
-                )
-            except Exception as e:
-                print(f"Failed to log prediction: {e}")
+            if not symbol:
+                return jsonify({'error': 'Symbol is required'}), 400
 
-            return jsonify(result)
+            result = get_cached_analysis(symbol, exchange)
+            if result:
+                try:
+                    backtesting.log_prediction(
+                        symbol=symbol,
+                        exchange=exchange,
+                        predictions=result['predictions'],
+                        current_price=result['currentPrice'],
+                        model_info={'features_used': result.get('features_used', 28)}
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to log prediction: {e}", exc_info=True)
 
-        return jsonify({'error': 'Analysis failed'}), 500
+                return jsonify(result)
+
+            return jsonify({'error': 'Analysis failed'}), 500
+        except Exception as e:
+            logger.error(f"Analyze error: {e}", exc_info=True)
+            return jsonify({'error': 'Analysis failed'}), 500
 
     @app.route('/api/analyze/<symbol>', methods=['GET'])
     @limiter.limit("10 per minute")
     @jwt_required()
     def analyze_stock_get(symbol):
-        exchange = request.args.get('exchange', 'NSE')
+        """Analyze stock via GET"""
+        try:
+            symbol = symbol.strip().upper()
+            exchange = request.args.get('exchange', 'NSE').upper()
 
-        result = get_cached_analysis(symbol, exchange)
-        if result:
-            try:
-                backtesting.log_prediction(
-                    symbol=symbol,
-                    exchange=exchange,
-                    predictions=result['predictions'],
-                    current_price=result['currentPrice'],
-                    model_info={'features_used': result.get('features_used', 28)}
-                )
-            except Exception as e:
-                print(f"Failed to log prediction: {e}")
+            result = get_cached_analysis(symbol, exchange)
+            if result:
+                try:
+                    backtesting.log_prediction(
+                        symbol=symbol,
+                        exchange=exchange,
+                        predictions=result['predictions'],
+                        current_price=result['currentPrice'],
+                        model_info={'features_used': result.get('features_used', 28)}
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to log prediction: {e}", exc_info=True)
 
-            return jsonify(result)
+                return jsonify(result)
 
-        return jsonify({'error': 'Analysis failed'}), 500
+            return jsonify({'error': 'Analysis failed'}), 500
+        except Exception as e:
+            logger.error(f"Analyze error: {e}", exc_info=True)
+            return jsonify({'error': 'Analysis failed'}), 500
 
     # ==================== NEWS ROUTES ====================
 
     @app.route('/api/news/stock/<symbol>', methods=['GET'])
     @limiter.limit("30 per minute")
     def get_stock_news(symbol):
-        exchange = request.args.get('exchange', 'NSE')
-        limit = int(request.args.get('limit', 10))
+        """Get news for a specific stock"""
         try:
+            exchange = request.args.get('exchange', 'NSE').upper()
+            limit = min(max(int(request.args.get('limit', 10)), 1), 50)  # Clamp 1-50
+            
             news = news_fetcher.get_stock_news(symbol, limit)
             for item in news:
                 item['relative_time'] = news_fetcher.get_relative_time(item['published_date'])
                 item['published_date'] = item['published_date'].isoformat()
+            
             return jsonify({'symbol': symbol, 'news': news, 'total': len(news)})
+        except ValueError:
+            return jsonify({'error': 'Invalid limit parameter'}), 400
         except Exception as e:
-            print(f"News fetch error: {e}")
-            return jsonify({'error': str(e)}), 500
+            logger.error(f"News fetch error: {e}", exc_info=True)
+            return jsonify({'error': 'Failed to fetch news'}), 500
 
     @app.route('/api/news/market', methods=['GET'])
     @limiter.limit("30 per minute")
     def get_market_news():
-        limit = int(request.args.get('limit', 20))
+        """Get general market news"""
         try:
+            limit = min(max(int(request.args.get('limit', 20)), 1), 100)  # Clamp 1-100
+            
             news = news_fetcher.get_market_news(limit)
             for item in news:
                 item['relative_time'] = news_fetcher.get_relative_time(item['published_date'])
                 item['published_date'] = item['published_date'].isoformat()
+            
             return jsonify({'news': news, 'total': len(news)})
+        except ValueError:
+            return jsonify({'error': 'Invalid limit parameter'}), 400
         except Exception as e:
-            print(f"Market news fetch error: {e}")
-            return jsonify({'error': str(e)}), 500
+            logger.error(f"Market news fetch error: {e}", exc_info=True)
+            return jsonify({'error': 'Failed to fetch market news'}), 500
 
     # ==================== CORPORATE ACTIONS ====================
 
     @app.route('/api/corporate-actions/<symbol>', methods=['GET'])
     @limiter.limit("30 per minute")
     def get_corporate_actions(symbol):
-        exchange = request.args.get('exchange', 'NSE')
+        """Get corporate actions for a stock"""
         try:
+            exchange = request.args.get('exchange', 'NSE').upper()
             actions = actions_tracker.get_corporate_actions(symbol, exchange)
+            
             if not actions:
                 return jsonify({'error': 'No data available'}), 404
+            
             return jsonify({'symbol': symbol, 'exchange': exchange, 'actions': actions})
         except Exception as e:
-            print(f"Corporate actions error: {e}")
-            return jsonify({'error': str(e)}), 500
+            logger.error(f"Corporate actions error: {e}", exc_info=True)
+            return jsonify({'error': 'Failed to fetch corporate actions'}), 500
 
     # ==================== BACKTESTING ROUTES ====================
 
@@ -388,37 +486,49 @@ def create_app(config_name='development'):
     @limiter.limit("30 per minute")
     @jwt_required()
     def get_backtest_stats():
-        symbol = request.args.get('symbol')
-        timeframe = request.args.get('timeframe')
-        days = int(request.args.get('days', 30))
+        """Get backtesting statistics"""
         try:
+            symbol = request.args.get('symbol')
+            timeframe = request.args.get('timeframe')
+            days = min(max(int(request.args.get('days', 30)), 1), 365)  # Clamp 1-365
+            
             stats = backtesting.get_accuracy_stats(symbol, timeframe, days)
             return jsonify(stats)
+        except ValueError:
+            return jsonify({'error': 'Invalid days parameter'}), 400
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            logger.error(f"Backtest stats error: {e}", exc_info=True)
+            return jsonify({'error': 'Failed to fetch statistics'}), 500
 
     @app.route('/api/backtest/recent', methods=['GET'])
     @limiter.limit("30 per minute")
     @jwt_required()
     def get_recent_predictions():
-        limit = int(request.args.get('limit', 20))
+        """Get recent predictions"""
         try:
+            limit = min(max(int(request.args.get('limit', 20)), 1), 100)  # Clamp 1-100
+            
             predictions = backtesting.get_recent_predictions(limit)
             return jsonify({'predictions': predictions, 'total': len(predictions)})
+        except ValueError:
+            return jsonify({'error': 'Invalid limit parameter'}), 400
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            logger.error(f"Recent predictions error: {e}", exc_info=True)
+            return jsonify({'error': 'Failed to fetch predictions'}), 500
 
     @app.route('/api/backtest/validate', methods=['POST'])
     @limiter.limit("5 per hour")
     @jwt_required()
     def validate_predictions_now():
+        """Manually trigger prediction validation"""
         try:
             count = backtesting.validate_predictions()
             return jsonify({'message': f'Validated {count} predictions', 'count': count})
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            logger.error(f"Validation error: {e}", exc_info=True)
+            return jsonify({'error': 'Validation failed'}), 500
 
-    # ==================== ANALYSIS HISTORY ROUTES (NEW) ====================
+    # ==================== ANALYSIS HISTORY ROUTES ====================
 
     @app.route('/api/analysis-history', methods=['GET'])
     @limiter.limit("60 per minute")
@@ -426,18 +536,16 @@ def create_app(config_name='development'):
     def get_analysis_history():
         """Get user's stock analysis history"""
         try:
-            current_user = get_jwt_identity()
+            current_user = int(get_jwt_identity())
             period = request.args.get('period', '7d')
-
-            print(f"📊 Fetching analysis history for {current_user}, period: {period}")
 
             # Calculate date range based on period
             days_map = {'7d': 7, '30d': 30, '90d': 90, 'all': None}
             days = days_map.get(period, 7)
 
-            # Query based on period - USE IMPORTED MODEL
+            # Query based on period
             if days:
-                start_date = datetime.now(datetime.UTC) - timedelta(days=days)
+                start_date = datetime.now(timezone.utc) - timedelta(days=days)
                 analyses = AnalysisHistory.query.filter(
                     AnalysisHistory.user_id == current_user,
                     AnalysisHistory.analyzed_at >= start_date
@@ -447,18 +555,16 @@ def create_app(config_name='development'):
                     user_id=current_user
                 ).order_by(AnalysisHistory.analyzed_at.desc()).all()
 
-            # Convert to dict using the model's to_dict method
             history = [a.to_dict() for a in analyses]
-
-            print(f"✅ Found {len(history)} analyses")
+            logger.info(f"Fetched {len(history)} analyses for user {current_user}")
+            
             return jsonify({'history': history}), 200
 
+        except ValueError:
+            return jsonify({'error': 'Invalid user ID'}), 400
         except Exception as e:
-            print(f"❌ Error fetching analysis history: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            return jsonify({'error': 'Failed to fetch analysis history', 'details': str(e)}), 500
-
+            logger.error(f"Error fetching analysis history: {e}", exc_info=True)
+            return jsonify({'error': 'Failed to fetch analysis history'}), 500
 
     @app.route('/api/save-analysis', methods=['POST'])
     @limiter.limit("60 per minute")
@@ -466,22 +572,24 @@ def create_app(config_name='development'):
     def save_analysis():
         """Save stock analysis to user's history"""
         try:
-            current_user = get_jwt_identity()
+            current_user = int(get_jwt_identity())
             data = request.json
 
-            print(f"💾 Saving analysis for {current_user}: {data.get('symbol')}")
+            if not data:
+                return jsonify({'error': 'Invalid request'}), 400
 
             # Validate required fields
-            if not data.get('symbol'):
+            symbol = data.get('symbol', '').strip().upper()
+            if not symbol:
                 return jsonify({'error': 'Symbol is required'}), 400
 
-            # Create analysis record - USE IMPORTED MODEL
+            # Create analysis record
             analysis = AnalysisHistory(
                 user_id=current_user,
-                symbol=data.get('symbol'),
-                name=data.get('name', data.get('symbol')),
-                exchange=data.get('exchange', 'NSE'),
-                analyzed_at=datetime.utcnow(),
+                symbol=symbol,
+                name=data.get('name', symbol),
+                exchange=data.get('exchange', 'NSE').upper(),
+                analyzed_at=datetime.now(timezone.utc),
                 current_price=data.get('currentPrice', 0),
                 predictions=data.get('predictions', {}),
                 technical=data.get('technical', {})
@@ -490,7 +598,7 @@ def create_app(config_name='development'):
             db.session.add(analysis)
             db.session.commit()
 
-            print(f"✅ Analysis saved: {data.get('symbol')} with ID {analysis.id}")
+            logger.info(f"Analysis saved for user {current_user}: {symbol}")
 
             return jsonify({
                 'success': True,
@@ -498,42 +606,59 @@ def create_app(config_name='development'):
                 'id': analysis.id
             }), 201
 
+        except ValueError:
+            return jsonify({'error': 'Invalid user ID'}), 400
         except Exception as e:
             db.session.rollback()
-            print(f"❌ Error saving analysis: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            return jsonify({'error': 'Failed to save analysis', 'details': str(e)}), 500
+            logger.error(f"Error saving analysis: {e}", exc_info=True)
+            return jsonify({'error': 'Failed to save analysis'}), 500
 
     # Create database tables
     with app.app_context():
-        db.create_all()
-        print("✅ Database tables created")
+        try:
+            db.create_all()
+            logger.info("Database tables created/verified")
+        except Exception as e:
+            logger.error(f"Database initialization error: {e}", exc_info=True)
 
     return app, socketio_instance
 
 
 if __name__ == '__main__':
     try:
-        app, socketio = create_app(os.getenv('FLASK_ENV', 'development'))
-        print("=" * 60)
-        print("StockPulse Backend v3.0 - Advanced AI + Real-Time Chat")
-        print("Features: Auth, Watchlist, Alerts, Portfolio, Advanced LSTM")
-        print("          News, Corporate Actions, Analysis History")
+        config_name = os.getenv('FLASK_ENV', 'development')
+        app, socketio = create_app(config_name)
+        
+        # Get configuration for server settings
+        from backend.config import get_config
+        config = get_config()
+        
+        host = config.HOST
+        port = config.PORT
+        debug = config.DEBUG
+        
+        logger = logging.getLogger(__name__)
+        logger.info("=" * 60)
+        logger.info("StockPulse Backend v3.0 - Advanced AI + Real-Time Chat")
+        logger.info(f"Environment: {config_name}")
+        logger.info(f"Features: Auth, Watchlist, Alerts, Portfolio, Advanced LSTM")
+        logger.info(f"          News, Corporate Actions, Analysis History")
         if socketio:
-            print("Real-Time Chat: WebSocket (supports 10,000+ concurrent users)")
+            logger.info("Real-Time Chat: WebSocket (supports 10,000+ concurrent users)")
         else:
-            print("Real-Time Chat: HTTP Polling (fallback)")
-        print("Server: http://localhost:5000")
-        print("=" * 60)
+            logger.info("Real-Time Chat: HTTP Polling (fallback)")
+        logger.info(f"Server: http://{host}:{port}")
+        logger.info("=" * 60)
 
         # Run with SocketIO if available, otherwise regular Flask
         if socketio:
-            socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+            socketio.run(app, host=host, port=port, debug=debug)
         else:
-            app.run(host='0.0.0.0', port=5000, debug=True)
+            app.run(host=host, port=port, debug=debug)
     except Exception as e:
-        print(f"FATAL ERROR: {e}")
+        logger = logging.getLogger(__name__)
+        logger.critical(f"FATAL ERROR: {e}", exc_info=True)
         import traceback
         traceback.print_exc()
-        input("Press Enter to exit...")
+        if os.getenv('FLASK_ENV') != 'production':
+            input("Press Enter to exit...")

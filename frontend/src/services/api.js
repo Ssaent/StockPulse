@@ -40,7 +40,7 @@ api.interceptors.response.use(
 );
 
 export const authAPI = {
-  register: (name, email, password) => api.post('/auth/register', { name, email, password }), // ✅ FIXED: Added name
+  register: (name, email, username, password) => api.post('/auth/register', { name, email, username, password }),  // ✅ FIXED: Added name
   login: (email, password) => api.post('/auth/login', { email, password }),
   verifyOTP: (email, otp) => api.post('/auth/verify-otp', { email, otp }), // ✅ ADDED
   resendOTP: (email) => api.post('/auth/resend-otp', { email }), // ✅ ADDED

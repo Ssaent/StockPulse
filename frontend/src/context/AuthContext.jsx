@@ -69,9 +69,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (name, email, password) => {
+  const register = async (name, email, username, password) => {  // ✅ ADD username parameter
     try {
-      const response = await authAPI.register(name, email, password);
+      const response = await authAPI.register(name, email, username, password);  // ✅ PASS username
       // Register only sends OTP, doesn't return token/user yet
       return { success: true, email };
     } catch (error) {

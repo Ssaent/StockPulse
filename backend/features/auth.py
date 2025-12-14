@@ -93,7 +93,6 @@ def register():
     """Register new user - Send OTP for email verification"""
     try:
         data = request.get_json()
-        print(f"📝 Raw registration data: {data}")  # DEBUG: See what's coming in
 
         # FIX: Handle the specific nested data structure from frontend
         # Data is coming as: {'name': {'name': 'SaiTeja', 'email': 'test@email.com', 'username': 'ssae', 'password': 'pass'}}
@@ -109,8 +108,6 @@ def register():
             email = data.get('email', '').strip().lower()
             username = data.get('username', '').strip()
             password = data.get('password', '')
-
-        print(f"📝 Registration attempt: {email} | Username: {username} | Name: {name}")
 
         # Validate name
         if not name or len(name) < 2:
@@ -164,8 +161,6 @@ def register():
         otp = generate_otp()
         otp_created_at = datetime.now(timezone.utc)
 
-        print(f"🔐 Generated OTP for {email}: {otp}")
-
         # Create user (not verified yet)
         user = User(
             name=name,
@@ -189,8 +184,6 @@ def register():
             otp=otp
         )
 
-        print(f"✅ User registered: {email} | Username: {username} (OTP sent: {email_sent})")
-
         return jsonify({
             'message': 'Registration successful! Please check your email for OTP.',
             'email': email,
@@ -201,10 +194,11 @@ def register():
 
     except Exception as e:
         db.session.rollback()
-        print(f"❌ Registration error: {e}")
+        # Add detailed error logging
         import traceback
+        print(f"Registration error: {e}")
         traceback.print_exc()
-        return jsonify({'error': 'Registration failed. Please try again.'}), 500
+        return jsonify({'error': 'Registration failed. Please try again.', 'details': str(e)}), 500
 
 
 # ==================== VERIFY OTP ENDPOINT ====================
@@ -219,8 +213,6 @@ def verify_otp():
 
         if not email or not otp:
             return jsonify({'error': 'Email and OTP are required'}), 400
-
-        print(f"🔍 OTP verification attempt for: {email}")
 
         # Find user
         user = User.query.filter_by(email=email).first()
@@ -297,8 +289,6 @@ def verify_otp():
             expires_delta=timedelta(days=7)
         )
 
-        print(f"✅ Email verified successfully: {user.email} | Username: {user.username}")
-
         return jsonify({
             'message': 'Email verified successfully! You can now login.',
             'token': access_token,
@@ -313,9 +303,6 @@ def verify_otp():
 
     except Exception as e:
         db.session.rollback()
-        print(f"❌ OTP verification error: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'error': 'OTP verification failed'}), 500
 
 
@@ -330,8 +317,6 @@ def resend_otp():
 
         if not email:
             return jsonify({'error': 'Email is required'}), 400
-
-        print(f"📧 Resend OTP request for: {email}")
 
         user = User.query.filter_by(email=email).first()
 
@@ -348,16 +333,12 @@ def resend_otp():
         user.otp_attempts = 0
         db.session.commit()
 
-        print(f"🔐 New OTP for {email}: {otp}")
-
         # Send OTP email
         email_sent = email_service.send_otp_email(
             user_email=user.email,
             user_name=user.name,
             otp=otp
         )
-
-        print(f"✅ OTP resent to: {user.email}")
 
         return jsonify({
             'message': 'New OTP sent! Please check your email.',
@@ -367,9 +348,6 @@ def resend_otp():
 
     except Exception as e:
         db.session.rollback()
-        print(f"❌ Resend OTP error: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'error': 'Failed to resend OTP'}), 500
 
 
@@ -384,8 +362,6 @@ def forgot_password():
 
         if not email:
             return jsonify({'error': 'Email is required'}), 400
-
-        print(f"🔐 Password reset request for: {email}")
 
         user = User.query.filter_by(email=email).first()
 
@@ -404,16 +380,12 @@ def forgot_password():
         user.otp_attempts = 0
         db.session.commit()
 
-        print(f"🔐 Password reset OTP for {email}: {reset_otp}")
-
         # Send reset email
         email_sent = email_service.send_password_reset_email(
             user_email=user.email,
             user_name=user.name,
             otp=reset_otp
         )
-
-        print(f"✅ Password reset email sent to: {user.email}")
 
         return jsonify({
             'message': 'Password reset instructions sent to your email.',
@@ -422,9 +394,6 @@ def forgot_password():
         }), 200
 
     except Exception as e:
-        print(f"❌ Forgot password error: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'error': 'Failed to process request'}), 500
 
 
@@ -441,8 +410,6 @@ def reset_password():
 
         if not email or not otp or not new_password:
             return jsonify({'error': 'Email, OTP, and new password are required'}), 400
-
-        print(f"🔐 Password reset attempt for: {email}")
 
         user = User.query.filter_by(email=email).first()
 
@@ -495,8 +462,6 @@ def reset_password():
         user.otp_attempts = 0
         db.session.commit()
 
-        print(f"✅ Password reset successful: {user.email}")
-
         # Send confirmation email
         email_service.send_password_changed_email(user.email, user.name)
 
@@ -506,9 +471,6 @@ def reset_password():
 
     except Exception as e:
         db.session.rollback()
-        print(f"❌ Password reset error: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'error': 'Failed to reset password'}), 500
 
 
@@ -522,8 +484,6 @@ def login():
 
         email = data.get('email', '').strip().lower()
         password = data.get('password', '')
-
-        print(f"🔐 Login attempt: {email}")
 
         if not email or not password:
             return jsonify({'error': 'Email and password required'}), 400
@@ -561,8 +521,6 @@ def login():
             expires_delta=timedelta(days=7)
         )
 
-        print(f"✅ Login successful: {email} | Username: {user.username}")
-
         return jsonify({
             'message': 'Login successful',
             'token': access_token,
@@ -576,10 +534,11 @@ def login():
         }), 200
 
     except Exception as e:
-        print(f"❌ Login error: {e}")
+        # Add detailed error logging
         import traceback
+        print(f"Login error: {e}")
         traceback.print_exc()
-        return jsonify({'error': 'Login failed'}), 500
+        return jsonify({'error': 'Login failed', 'details': str(e)}), 500
 
 
 # ==================== GET CURRENT USER ====================
@@ -598,7 +557,6 @@ def get_current_user():
         return jsonify({'user': user.to_dict()}), 200
 
     except Exception as e:
-        print(f"Error fetching user: {e}")
         return jsonify({'error': 'Failed to fetch user'}), 500
 
 
@@ -635,13 +593,10 @@ def change_password():
         user.password_hash = bcrypt.generate_password_hash(new_password, rounds=12).decode('utf-8')
         db.session.commit()
 
-        print(f"✅ Password changed: {user.email}")
-
         return jsonify({'message': 'Password changed successfully'}), 200
 
     except Exception as e:
         db.session.rollback()
-        print(f"❌ Change password error: {e}")
         return jsonify({'error': 'Failed to change password'}), 500
 
 
@@ -685,8 +640,6 @@ def update_profile():
 
         db.session.commit()
 
-        print(f"✅ Profile updated: {user.email} | Username: {user.username}")
-
         return jsonify({
             'message': 'Profile updated successfully',
             'user': user.to_dict()
@@ -694,5 +647,4 @@ def update_profile():
 
     except Exception as e:
         db.session.rollback()
-        print(f"❌ Profile update error: {e}")
         return jsonify({'error': 'Failed to update profile'}), 500
