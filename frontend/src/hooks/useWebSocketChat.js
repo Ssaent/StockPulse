@@ -7,9 +7,11 @@ export function useWebSocketChat() {
   const [messages, setMessages] = useState([]);
   const [onlineCount, setOnlineCount] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);  // ✅ PREVENT MULTIPLE CONNECTIONS
   const [typingUsers, setTypingUsers] = useState(new Set());
   const [authError, setAuthError] = useState('');
 
+  // ✅ Get user for optional userId, but don't depend on it
   const { user } = useAuth();
   const typingTimeoutRef = useRef({});
 
@@ -19,147 +21,173 @@ export function useWebSocketChat() {
   };
 
   useEffect(() => {
+    // ✅ CHANGED: Connect immediately when token exists
     const token = getToken();
-
-    if (!token || !user) {
-      console.log('🔌 WebSocket: No token or user, skipping connection');
+    
+    // If no token at all, skip entirely
+    if (!token) {
+      console.log('🔌 WebSocket: No token, skipping connection');
       if (socket) {
         socket.close();
         setSocket(null);
       }
+      setIsConnected(false);
+      setAuthError('Not authenticated. Please log in again.');
       return;
     }
 
-    console.log('🔌 Connecting to WebSocket with token:', token ? 'Present' : 'Missing');
+    // ✅ CHANGED: Always attempt connection when token exists
+    // Let server-side auth handle validation
+    console.log('🔌 Connecting to WebSocket with token...');
+    
+    // Prevent multiple connections
+    if (socket || isConnecting) {
+      console.log('🔌 Socket already exists or connecting, skipping...');
+      return;
+    }
+    
+    setIsConnecting(true);
 
     const newSocket = io('http://localhost:5000', {
       auth: {
         token: token,
-        userId: user.id
+        userId: user?.id // Optional, server will validate
       },
       transports: ['websocket', 'polling'],
       reconnection: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: 3,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 20000,
+      reconnectionDelayMax: 3000,
+      timeout: 10000,
       forceNew: true
     });
 
     newSocket.on('connect', () => {
       console.log('✅ WebSocket connected! Socket ID:', newSocket.id);
       setIsConnected(true);
+      setIsConnecting(false);  // ✅ RESET CONNECTING STATE
       setAuthError('');
-      newSocket.emit('get_history', { limit: 100 });
-    });
 
-    newSocket.on('connect_error', (error) => {
-      console.error('❌ WebSocket connection error:', error.message);
-      setIsConnected(false);
-
-      // Handle authentication errors specifically
-      if (error.message.includes('auth') || error.message.includes('401') || error.message.includes('403')) {
-        setAuthError('Authentication failed. Please log in again.');
-        console.error('🔐 Auth error - clearing token');
-        localStorage.removeItem('token');
-      }
+      // Get chat history
+      newSocket.emit('get_history', { limit: 50 });
     });
 
     newSocket.on('disconnect', (reason) => {
-      console.log('⚠️ WebSocket disconnected:', reason);
+      console.log('❌ WebSocket disconnected:', reason);
       setIsConnected(false);
+      setIsConnecting(false);  // ✅ RESET ON DISCONNECT
 
-      // Auto-reconnect on network errors
-      if (reason === 'io server disconnect' || reason === 'transport close') {
-        console.log('🔄 Attempting to reconnect...');
-        setTimeout(() => {
-          if (getToken()) {
-            newSocket.connect();
-          }
-        }, 2000);
+      if (reason === 'io server disconnect') {
+        console.log('🔄 Server disconnected, attempting reconnect...');
       }
     });
 
-    newSocket.on('auth_error', (data) => {
-      console.error('🔐 Server auth error:', data.message);
-      setAuthError(data.message || 'Authentication failed');
+    newSocket.on('connect_error', (error) => {
+      console.error('🚨 WebSocket connection error:', error);
       setIsConnected(false);
-    });
+      setIsConnecting(false);  // ✅ RESET ON ERROR
 
-    newSocket.on('chat_history', (data) => {
-      console.log(`📜 Loaded ${data.messages?.length || 0} messages`);
-      setMessages(data.messages || []);
-    });
-
-    newSocket.on('new_message', (message) => {
-      console.log('📨 New message from:', message.username);
-      setMessages(prev => [...prev, message]);
-    });
-
-    newSocket.on('online_count', (data) => {
-      console.log(`👥 Online users: ${data.count}`);
-      setOnlineCount(data.count || 0);
+      if (error.message.includes('Authentication failed') || error.message.includes('Not authenticated')) {
+        setAuthError('Authentication failed. Please log in again.');
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+      }
     });
 
     newSocket.on('user_joined', (data) => {
-      console.log(`✅ ${data.username} joined the chat`);
-      setOnlineCount(data.online_count || 0);
+      console.log('👋 User joined:', data);
+      setOnlineCount(data.online_count);
     });
 
     newSocket.on('user_left', (data) => {
-      console.log(`❌ ${data.username} left the chat`);
-      setOnlineCount(data.online_count || 0);
+      console.log('👋 User left:', data);
+      setOnlineCount(data.online_count);
+    });
+
+    newSocket.on('online_count', (data) => {
+      setOnlineCount(data.count);
+    });
+
+    newSocket.on('new_message', (message) => {
+      console.log('📨 New message received:', message);
+      setMessages(prev => {
+        // Avoid duplicates
+        if (prev.some(m => m.id === message.id)) {
+          return prev;
+        }
+        return [...prev, message];
+      });
+    });
+
+    newSocket.on('chat_history', (data) => {
+      console.log('📚 Chat history received:', data.total, 'messages');
+      setMessages(data.messages || []);
     });
 
     newSocket.on('user_typing', (data) => {
-      if (data.typing) {
-        setTypingUsers(prev => new Set(prev).add(data.username));
-
-        if (typingTimeoutRef.current[data.username]) {
-          clearTimeout(typingTimeoutRef.current[data.username]);
+      setTypingUsers(prev => {
+        const newSet = new Set(prev);
+        if (data.typing) {
+          newSet.add(data.username || data.user_id);
+        } else {
+          newSet.delete(data.username || data.user_id);
         }
+        return newSet;
+      });
 
-        typingTimeoutRef.current[data.username] = setTimeout(() => {
+      // Clear typing indicator after 3 seconds
+      if (data.typing) {
+        if (typingTimeoutRef.current[data.user_id]) {
+          clearTimeout(typingTimeoutRef.current[data.user_id]);
+        }
+        typingTimeoutRef.current[data.user_id] = setTimeout(() => {
           setTypingUsers(prev => {
             const newSet = new Set(prev);
-            newSet.delete(data.username);
+            newSet.delete(data.username || data.user_id);
             return newSet;
           });
         }, 3000);
-      } else {
-        setTypingUsers(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(data.username);
-          return newSet;
-        });
       }
     });
 
-    newSocket.on('error', (data) => {
-      console.error('⚠️ Server error:', data.message);
-      setAuthError(data.message || 'Connection error');
+    newSocket.on('reaction_update', (data) => {
+      setMessages(prev => prev.map(msg => {
+        if (msg.id === data.message_id) {
+          // Update reactions in message
+          const reactions = msg.reactions || [];
+          // Update reaction logic here
+          return { ...msg, reactions };
+        }
+        return msg;
+      }));
+    });
+
+    newSocket.on('error', (error) => {
+      console.error('🚨 WebSocket error:', error);
+      setAuthError(error.message || 'Connection error');
+      setIsConnecting(false);  // ✅ RESET ON ERROR
     });
 
     setSocket(newSocket);
 
+    // Cleanup function
     return () => {
-      console.log('🔌 Cleaning up WebSocket connection');
-      Object.values(typingTimeoutRef.current).forEach(clearTimeout);
+      console.log('🧹 Cleaning up WebSocket connection');
       if (newSocket) {
-        newSocket.removeAllListeners();
         newSocket.close();
       }
+      setIsConnecting(false);  // ✅ RESET ON CLEANUP
     };
-  }, [user]);
+  }, []); // ✅ CHANGED: No dependencies - connect once on mount
 
   const sendMessage = useCallback((content) => {
-    const token = getToken();
-
     if (!socket || !isConnected) {
-      setAuthError('Not connected to chat. Please refresh the page.');
+      console.warn('🚫 Cannot send message: WebSocket not connected');
+      setAuthError('Not connected. Please refresh the page.');
       return false;
     }
 
+    const token = getToken();
     if (!token) {
       setAuthError('Not authenticated. Please log in again.');
       return false;
@@ -179,23 +207,23 @@ export function useWebSocketChat() {
     }
   }, [socket, isConnected]);
 
-  // Add reconnection function
-  const reconnect = useCallback(() => {
-    if (socket) {
-      socket.connect();
+  const reactToMessage = useCallback((messageId, emoji) => {
+    if (socket && isConnected && messageId && emoji) {
+      socket.emit('react_message', { message_id: messageId, emoji });
+      return true;
     }
-  }, [socket]);
+    return false;
+  }, [socket, isConnected]);
 
   return {
     messages,
     onlineCount,
+    isConnected,
+    typingUsers: Array.from(typingUsers),
+    authError,
     sendMessage,
     sendTyping,
-    isConnected,
-    authError,
-    setAuthError,
-    reconnect,
-    typingUsers: Array.from(typingUsers),
-    socket
+    reactToMessage,
+    clearAuthError: () => setAuthError('')
   };
 }

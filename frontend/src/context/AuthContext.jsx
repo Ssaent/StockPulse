@@ -1,44 +1,55 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authAPI } from '../services/api';
 
 const AuthContext = createContext();
 
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within AuthProvider');
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
   return context;
-};
+}
 
-export const AuthProvider = ({ children }) => {
+export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [initialized, setInitialized] = useState(false);
-
-  useEffect(() => {
-    if (!initialized) {
-      checkAuth();
-      setInitialized(true);
-    }
-  }, [initialized]);
 
   const checkAuth = async () => {
     const token = localStorage.getItem('token');
-
+    console.log('🔍 checkAuth: Token from localStorage:', token ? 'Present' : 'Missing');
+    
     if (!token) {
+      console.log('❌ checkAuth: No token found, setting loading to false');
       setLoading(false);
       return;
     }
 
     try {
+      console.log('📡 checkAuth: Calling /api/auth/me with token...');
+      console.log('📡 checkAuth: Full URL:', 'http://localhost:5000/api/auth/me');
+      console.log('📡 checkAuth: Headers will include:', `Authorization: Bearer ${token.substring(0, 20)}...`);
+      
       const response = await authAPI.getCurrentUser();
+      console.log('✅ checkAuth: Response received:', response);
+      console.log('✅ checkAuth: Response status:', response.status);
+      console.log('✅ checkAuth: Response data:', response.data);
+      console.log('✅ checkAuth: User loaded successfully:', response.data.user.username);
       setUser(response.data.user);
     } catch (error) {
-      console.error('Auth check failed:', error);
+      console.error('❌ checkAuth: Auth check failed:', error);
+      console.error('❌ checkAuth: Error response:', error.response);
+      console.error('❌ checkAuth: Error status:', error.response?.status);
+      console.error('❌ checkAuth: Error data:', error.response?.data);
+      console.error('❌ checkAuth: Error message:', error.message);
+      
       if (error.response?.status === 401) {
+        console.log('🗑️ checkAuth: Token invalid, removing from localStorage');
         localStorage.removeItem('token');
         setUser(null);
       }
     } finally {
+      console.log('🏁 checkAuth: Setting loading to false');
       setLoading(false);
     }
   };
@@ -69,9 +80,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (name, email, username, password) => {  // ✅ ADD username parameter
+  const register = async (name, email, username, password) => {
     try {
-      const response = await authAPI.register(name, email, username, password);  // ✅ PASS username
+      const response = await authAPI.register(name, email, username, password);
       // Register only sends OTP, doesn't return token/user yet
       return { success: true, email };
     } catch (error) {
@@ -86,7 +97,7 @@ export const AuthProvider = ({ children }) => {
       const { token, user } = response.data;
 
       localStorage.setItem('token', token);
-      console.log('✅ OTP verified, token saved:', token);
+      console.log('✅ OTP verification token saved:', token);
       setUser(user);
 
       return { success: true, user };
@@ -98,7 +109,7 @@ export const AuthProvider = ({ children }) => {
 
   const resendOTP = async (email) => {
     try {
-      const response = await authAPI.resendOTP(email);
+      await authAPI.resendOTP(email);
       return { success: true };
     } catch (error) {
       console.error('Resend OTP failed:', error);
@@ -109,33 +120,62 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
+    console.log('🚪 User logged out, token removed');
   };
+
+  const resetPassword = async (email) => {
+    try {
+      await authAPI.resetPassword(email);
+      return { success: true };
+    } catch (error) {
+      console.error('Password reset failed:', error);
+      throw error;
+    }
+  };
+
+  const changePassword = async (oldPassword, newPassword) => {
+    try {
+      await authAPI.changePassword(oldPassword, newPassword);
+      return { success: true };
+    } catch (error) {
+      console.error('Change password failed:', error);
+      throw error;
+    }
+  };
+
+  const updateProfile = async (userData) => {
+    try {
+      const response = await authAPI.updateProfile(userData);
+      setUser(response.data.user);
+      return { success: true, user: response.data.user };
+    } catch (error) {
+      console.error('Update profile failed:', error);
+      throw error;
+    }
+  };
+
+  useEffect(() => {
+    console.log('🔄 AuthContext: useEffect triggered, checking auth...');
+    checkAuth();
+  }, []);
 
   const value = {
     user,
+    loading,
     login,
     register,
     verifyOTP,
     resendOTP,
     logout,
-    loading,
+    resetPassword,
+    changePassword,
+    updateProfile,
     isAuthenticated: !!user
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950">
-        <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
-};
+}

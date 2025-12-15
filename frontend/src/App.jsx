@@ -38,8 +38,9 @@ function AppContent() {
   const { user } = useAuth();
   const [chatOpen, setChatOpen] = useState(false);
 
-  // ✅ UPDATED: Remove token parameter - hook now handles authentication internally
-  const { onlineCount } = useWebSocketChat();
+  // ✅ REMOVED: useWebSocketChat hook from here to prevent duplicate connections
+  // ✅ ADDED: Static onlineCount for now, can be shared from WebSocket context later
+  const [onlineCount, setOnlineCount] = useState(0);
 
   return (
     <>
@@ -108,7 +109,7 @@ function AppContent() {
           }
         />
         <Route
-          path="/news"
+          path="/market-news"
           element={
             <PrivateRoute>
               <MarketNews />
@@ -116,12 +117,13 @@ function AppContent() {
           }
         />
 
-        {/* 404 Fallback */}
+        {/* Catch-all route */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
 
-      {/* Global Chat - Only show for logged-in users */}
-      {user && (
+      {/* Global Chat - Show during loading if token exists, or when user exists */}
+      {/* ✅ FIXED: Show chat components during auth loading to allow WebSocket connection */}
+      {(user || localStorage.getItem('token')) && (
         <>
           <ChatToggleButton
             onClick={() => setChatOpen(true)}
