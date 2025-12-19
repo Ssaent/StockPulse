@@ -98,7 +98,7 @@ class AutoUpdater:
         mod_time = os.path.getmtime(model_file)
         days_old = (datetime.now().timestamp() - mod_time) / 86400
 
-        return days_old >= 0.001
+        return days_old >= 7
 
     def update_model(self, symbol):
         """Update model with latest data"""

@@ -41,8 +41,8 @@ class BacktestingEngine:
         """
         now = datetime.now()
 
-        # Get all unvalidated predictions where target date has passed
-        pending = PredictionLog.query.filter(
+        # ✅ Use db imported in this method
+        pending = db.session.query(PredictionLog).filter(
             PredictionLog.is_validated == False,
             PredictionLog.target_date <= now
         ).all()
@@ -184,7 +184,8 @@ class BacktestingEngine:
         """
         cutoff_date = datetime.now() - timedelta(days=days)
 
-        query = PredictionLog.query.filter(
+        # ✅ Use db.session.query instead of global PredictionLog.query
+        query = db.session.query(PredictionLog).filter(
             PredictionLog.is_validated == True,
             PredictionLog.validated_at >= cutoff_date
         )
@@ -256,7 +257,8 @@ class BacktestingEngine:
         Returns:
             List of prediction dictionaries
         """
-        query = PredictionLog.query.filter(
+        # Use global db and PredictionLog imported at module level
+        query = db.session.query(PredictionLog).filter(
             PredictionLog.is_validated == True
         ).order_by(PredictionLog.validated_at.desc())
 

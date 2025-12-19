@@ -29,8 +29,8 @@ if __name__ == '__main__':
         from services.backtesting_service import BacktestingEngine
         from app import create_app
 
-        # Create app
-        app = create_app()
+        # Create app - ✅ FIXED: Unpack tuple
+        app, socketio = create_app()
 
         # Run validation
         with app.app_context():

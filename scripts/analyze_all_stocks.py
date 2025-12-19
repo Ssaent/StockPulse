@@ -1,14 +1,14 @@
 """
-Fixed Stock Analysis Script - Ensures Real Predictions
-Analyzes NIFTY 50 + Random 100 stocks (mid-cap + small-cap)
+STOCKPULSE - PRODUCTION READY
+Analyzes NIFTY 50 + Mid-cap + Small-cap stocks
+Generates real AI predictions for production use
 """
 
 import sys
 import os
+import sqlite3
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
-from app import create_app
-from database.models import db, PredictionLog
 from services.ai_predictor import StockPredictor
 import yfinance as yf
 import pandas as pd
@@ -18,22 +18,27 @@ import random
 import warnings
 warnings.filterwarnings('ignore')
 
+def get_db_path():
+    """Get database path"""
+    return os.path.join(os.path.dirname(__file__), '..', 'instance', 'stockpulse.db')
+
 def get_nifty50_stocks():
     """Get NIFTY 50 stocks"""
-    nifty50 = [
-        'RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK', 'HINDUNILVR', 'ITC',
-        'SBIN', 'BHARTIARTL', 'BAJFINANCE', 'KOTAKBANK', 'LT', 'AXISBANK',
-        'ASIANPAINT', 'MARUTI', 'TITAN', 'SUNPHARMA', 'ULTRACEMCO', 'NESTLEIND',
-        'WIPRO', 'ONGC', 'NTPC', 'POWERGRID', 'TATAMOTORS', 'TATASTEEL', 'M&M',
-        'TECHM', 'BAJAJFINSV', 'HCLTECH', 'ADANIPORTS', 'DRREDDY', 'COALINDIA',
-        'INDUSINDBK', 'JSWSTEEL', 'GRASIM', 'DIVISLAB', 'APOLLOHOSP', 'EICHERMOT',
-        'BRITANNIA', 'CIPLA', 'SHREECEM', 'SBILIFE', 'HEROMOTOCO', 'UPL',
-        'HINDALCO', 'TATACONSUM', 'BAJAJ-AUTO', 'ADANIENT', 'BPCL', 'HDFCLIFE'
+    return [
+        {'symbol': s, 'category': 'NIFTY 50'} for s in [
+            'RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK', 'HINDUNILVR', 'ITC',
+            'SBIN', 'BHARTIARTL', 'BAJFINANCE', 'KOTAKBANK', 'LT', 'AXISBANK',
+            'ASIANPAINT', 'MARUTI', 'TITAN', 'SUNPHARMA', 'ULTRACEMCO', 'NESTLEIND',
+            'WIPRO', 'ONGC', 'NTPC', 'POWERGRID', 'TATAMOTORS', 'TATASTEEL', 'M&M',
+            'TECHM', 'BAJAJFINSV', 'HCLTECH', 'ADANIPORTS', 'DRREDDY', 'COALINDIA',
+            'INDUSINDBK', 'JSWSTEEL', 'GRASIM', 'DIVISLAB', 'APOLLOHOSP', 'EICHERMOT',
+            'BRITANNIA', 'CIPLA', 'SHREECEM', 'SBILIFE', 'HEROMOTOCO', 'UPL',
+            'HINDALCO', 'TATACONSUM', 'BAJAJ-AUTO', 'ADANIENT', 'BPCL', 'HDFCLIFE'
+        ]
     ]
-    return [{'symbol': s, 'category': 'NIFTY 50'} for s in nifty50]
 
-def get_midcap_stocks(count=50):
-    """Get random mid-cap stocks"""
+def get_midcap_stocks():
+    """Get mid-cap stocks"""
     midcaps = [
         'CHOLAFIN', 'GODREJCP', 'MCDOWELL-N', 'DABUR', 'BANDHANBNK', 'VOLTAS',
         'GODREJPROP', 'INDIGO', 'HAVELLS', 'PIDILITIND', 'MARICO', 'MPHASIS',
@@ -48,10 +53,10 @@ def get_midcap_stocks(count=50):
         'SRF', 'PAGEIND', 'CASTROLIND', 'ENDURANCE', 'METROPOLIS', 'ASTRAL',
         'CHAMBLFERT', 'GMRINFRA', 'L&TFH', 'MOTHERSON'
     ]
-    return [{'symbol': s, 'category': 'MID CAP'} for s in random.sample(midcaps, min(count, len(midcaps)))]
+    return [{'symbol': s, 'category': 'MID CAP'} for s in random.sample(midcaps, 50)]
 
-def get_smallcap_stocks(count=50):
-    """Get random small-cap stocks"""
+def get_smallcap_stocks():
+    """Get small-cap stocks"""
     smallcaps = [
         'IDFCFIRSTB', 'ZEEL', 'LINDEINDIA', 'NATIONALUM', 'RBLBANK', 'CROMPTON',
         'GODREJIND', 'ASHOKLEY', 'CENTRALBK', 'FEDERALBNK', 'APLAPOLLO',
@@ -67,16 +72,15 @@ def get_smallcap_stocks(count=50):
         'SUNDRMFAST', 'SUPRAJIT', 'SUPREMEIND', 'SWANENERGY', 'SYMPHONY',
         'TATAELXSI', 'TCIEXP', 'TECHM', 'THERMAX', 'THYROCARE'
     ]
-    return [{'symbol': s, 'category': 'SMALL CAP'} for s in random.sample(smallcaps, min(count, len(smallcaps)))]
+    return [{'symbol': s, 'category': 'SMALL CAP'} for s in random.sample(smallcaps, 50)]
 
 def verify_prediction_quality(predicted_price, current_price, confidence):
-    """Verify that prediction makes sense"""
+    """Verify prediction quality"""
     if predicted_price == 0 or current_price == 0:
         return False, "Zero price detected"
 
     change_pct = ((predicted_price - current_price) / current_price) * 100
 
-    # Check if change is reasonable
     if abs(change_pct) < 0.01:
         return False, f"Change too small: {change_pct:.4f}%"
 
@@ -88,8 +92,8 @@ def verify_prediction_quality(predicted_price, current_price, confidence):
 
     return True, f"Valid prediction: {change_pct:+.2f}%"
 
-def analyze_stock(symbol, category, predictor):
-    """Analyze a single stock with detailed logging"""
+def analyze_stock(symbol, category, predictor, cursor):
+    """Analyze stock and save directly to SQLite"""
     try:
         print(f"\n{'='*60}")
         print(f"🔍 Analyzing {symbol} ({category})")
@@ -101,35 +105,31 @@ def analyze_stock(symbol, category, predictor):
 
         if hist.empty:
             print(f"❌ No data available for {symbol}")
-            return False
+            return 0
 
         current_price = float(hist['Close'].iloc[-1])
         print(f"💰 Current Price: ₹{current_price:.2f}")
 
         if current_price <= 0:
             print(f"❌ Invalid price: ₹{current_price}")
-            return False
+            return 0
 
         # Generate predictions
         print(f"🤖 Generating predictions...")
-
         predictions = {
             'intraday': predictor.predict(symbol, 'intraday'),
             'weekly': predictor.predict(symbol, 'weekly'),
             'monthly': predictor.predict(symbol, 'monthly')
         }
 
-        # Verify and log each prediction
         valid_predictions = 0
 
         for timeframe, pred_data in predictions.items():
             predicted_price = pred_data['predicted_price']
             confidence = pred_data['confidence']
 
-            # Calculate change
             change_pct = ((predicted_price - current_price) / current_price) * 100
 
-            # Verify quality
             is_valid, message = verify_prediction_quality(predicted_price, current_price, confidence)
 
             status = "✅" if is_valid else "⚠️"
@@ -140,136 +140,135 @@ def analyze_stock(symbol, category, predictor):
 
                 # Calculate target date
                 if timeframe == 'intraday':
-                    target_date = datetime.now() + timedelta(days=1)
+                    days = 1
                 elif timeframe == 'weekly':
-                    target_date = datetime.now() + timedelta(days=7)
-                else:  # monthly
-                    target_date = datetime.now() + timedelta(days=30)
+                    days = 7
+                else:
+                    days = 30
 
-                # Create prediction log
-                prediction_log = PredictionLog(
-                    symbol=symbol,
-                    exchange='NSE',
-                    prediction_date=datetime.now(),
-                    timeframe=timeframe,
-                    predicted_price=predicted_price,
-                    predicted_change_pct=change_pct,
-                    confidence=confidence,
-                    current_price_at_prediction=current_price,
-                    target_date=target_date,
-                    model_version='v3.0',
-                    features_used=28,
-                    is_validated=False
-                )
+                target_date = datetime.now() + timedelta(days=days)
 
-                db.session.add(prediction_log)
+                # Save directly to SQLite
+                cursor.execute("""
+                    INSERT INTO prediction_logs 
+                    (symbol, exchange, prediction_date, timeframe, predicted_price, 
+                     predicted_change_pct, confidence, current_price_at_prediction, 
+                     target_date, model_version, features_used, is_validated)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    symbol, 'NSE', datetime.now(), timeframe, predicted_price,
+                    change_pct, confidence, current_price, target_date,
+                    'v3.0', 28, False
+                ))
 
-        if valid_predictions > 0:
-            db.session.commit()
-            print(f"✅ Logged {valid_predictions}/3 valid predictions for {symbol}")
-            return True
-        else:
-            print(f"❌ No valid predictions for {symbol}")
-            return False
+        return valid_predictions
 
     except Exception as e:
         print(f"❌ Error analyzing {symbol}: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return False
+        return 0
 
 def main():
     print("="*60)
-    print("STOCKPULSE - COMPREHENSIVE MARKET ANALYSIS")
+    print("STOCKPULSE - PRODUCTION ANALYSIS")
+    print("Analyzing NIFTY 50 + Mid-cap + Small-cap stocks")
     print("="*60)
 
-    # Create Flask app context
-    app = create_app()
+    db_path = get_db_path()
+    
+    if not os.path.exists(db_path):
+        print(f"❌ Database not found: {db_path}")
+        return
 
-    with app.app_context():
-        # Initialize predictor
-        print("\n🤖 Initializing AI Predictor...")
-        predictor = StockPredictor()
+    print(f"📊 Using database: {db_path}")
 
-        # Get stock lists
-        print("\n📊 Building stock list...")
-        nifty_stocks = get_nifty50_stocks()
-        midcap_stocks = get_midcap_stocks(50)
-        smallcap_stocks = get_smallcap_stocks(50)
+    # Initialize predictor
+    print("\n🤖 Initializing AI Predictor...")
+    predictor = StockPredictor()
 
-        all_stocks = nifty_stocks + midcap_stocks + smallcap_stocks
+    # Get all stocks (PRODUCTION: Full analysis)
+    print("\n📊 Building complete stock list...")
+    nifty_stocks = get_nifty50_stocks()
+    midcap_stocks = get_midcap_stocks()
+    smallcap_stocks = get_smallcap_stocks()
 
-        print(f"\n📈 Total stocks to analyze: {len(all_stocks)}")
-        print(f"  - NIFTY 50: {len(nifty_stocks)}")
-        print(f"  - MID CAP: {len(midcap_stocks)}")
-        print(f"  - SMALL CAP: {len(smallcap_stocks)}")
+    all_stocks = nifty_stocks + midcap_stocks + smallcap_stocks
 
-        # Confirm
-        response = input("\n⚠️  This will take 2-4 hours. Continue? (yes/no): ")
-        if response.lower() != 'yes':
-            print("❌ Cancelled")
-            return
+    print(f"\n📈 Total stocks to analyze: {len(all_stocks)}")
+    print(f"  - NIFTY 50: {len(nifty_stocks)}")
+    print(f"  - MID CAP: {len(midcap_stocks)}")
+    print(f"  - SMALL CAP: {len(smallcap_stocks)}")
 
-        # Analyze all stocks
-        results = {
-            'NIFTY 50': {'success': 0, 'failed': 0},
-            'MID CAP': {'success': 0, 'failed': 0},
-            'SMALL CAP': {'success': 0, 'failed': 0}
-        }
+    # Production warning
+    print(f"\n⚠️  PRODUCTION RUN: This will analyze {len(all_stocks)} stocks")
+    print(f"   Estimated time: {len(all_stocks) * 0.5:.0f} minutes")
+    response = input("\n⚠️  Continue with full production analysis? (yes/no): ")
+    if response.lower() != 'yes':
+        print("❌ Cancelled")
+        return
 
+    # Connect to database
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    results = {'NIFTY 50': 0, 'MID CAP': 0, 'SMALL CAP': 0}
+    total_processed = 0
+
+    try:
         for i, stock in enumerate(all_stocks, 1):
             print(f"\n[{i}/{len(all_stocks)}] Processing {stock['category']} - {stock['symbol']}...")
 
-            success = analyze_stock(stock['symbol'], stock['category'], predictor)
+            valid_count = analyze_stock(stock['symbol'], stock['category'], predictor, cursor)
 
-            if success:
-                results[stock['category']]['success'] += 1
-            else:
-                results[stock['category']]['failed'] += 1
+            if valid_count > 0:
+                results[stock['category']] += 1
+
+            total_processed += 1
 
             # Progress update every 10 stocks
             if i % 10 == 0:
-                total_success = sum(r['success'] for r in results.values())
                 progress = (i / len(all_stocks)) * 100
-                print(f"\n📊 Progress: {progress:.1f}% | Successful: {total_success}/{i}")
+                print(f"\n📊 Progress: {progress:.1f}% | Processed: {i}/{len(all_stocks)} | Success: {sum(results.values())}")
 
+        # Commit all changes
+        conn.commit()
+        print("\n✅ All predictions saved to database!")
+        
         # Final summary
-        print("\n" + "="*60)
-        print("ANALYSIS COMPLETE")
-        print("="*60)
-
-        total_success = sum(r['success'] for r in results.values())
-        total_failed = sum(r['failed'] for r in results.values())
-
+        total_success = sum(results.values())
         print(f"\n✅ Successfully analyzed: {total_success} stocks")
-        print(f"❌ Failed: {total_failed} stocks")
+        print(f"❌ Failed: {total_processed - total_success} stocks")
         print(f"📈 Success Rate: {(total_success / len(all_stocks) * 100):.1f}%")
 
         print(f"\n📊 By Category:")
-        for category, stats in results.items():
-            total = stats['success'] + stats['failed']
-            rate = (stats['success'] / total * 100) if total > 0 else 0
-            print(f"  {category}: Success: {stats['success']}/{total} ({rate:.1f}%)")
+        for category, success_count in results.items():
+            total_in_category = len([s for s in all_stocks if s['category'] == category])
+            rate = (success_count / total_in_category * 100) if total_in_category > 0 else 0
+            print(f"  {category}: Success: {success_count}/{total_in_category} ({rate:.1f}%)")
 
         # Database summary
-        total_predictions = PredictionLog.query.count()
-        intraday = PredictionLog.query.filter_by(timeframe='intraday').count()
-        weekly = PredictionLog.query.filter_by(timeframe='weekly').count()
-        monthly = PredictionLog.query.filter_by(timeframe='monthly').count()
-
+        cursor.execute("SELECT COUNT(*) FROM prediction_logs")
+        total_predictions = cursor.fetchone()[0]
         print(f"\n💾 Database Status:")
         print(f"  Total Predictions: {total_predictions}")
-        print(f"  INTRADAY: {intraday}")
-        print(f"  WEEKLY: {weekly}")
-        print(f"  MONTHLY: {monthly}")
 
-        print(f"\n🎯 Next Steps:")
-        print(f"  1. Day 1: Run python scripts/validate_simple.py (intraday)")
-        print(f"  2. Day 7: Run python scripts/validate_simple.py (weekly)")
-        print(f"  3. Day 30: Run python scripts/validate_simple.py (monthly)")
-        print(f"  4. View accuracy: http://localhost:5173/backtesting")
+        # Timeframe breakdown
+        cursor.execute("SELECT timeframe, COUNT(*) FROM prediction_logs GROUP BY timeframe")
+        timeframe_counts = cursor.fetchall()
+        for timeframe, count in timeframe_counts:
+            print(f"  {timeframe.upper()}: {count}")
+
+        print(f"\n🎯 PRODUCTION COMPLETE!")
+        print(f"  Users can now see {total_predictions} AI predictions on the dashboard")
+        print(f"  Predictions will be validated automatically over time")
+        print(f"  View accuracy: http://localhost:5173/backtesting")
 
         print("\n" + "="*60)
+
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
 
 if __name__ == '__main__':
     main()
