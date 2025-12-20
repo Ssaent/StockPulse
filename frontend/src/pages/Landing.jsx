@@ -19,7 +19,7 @@ export default function LandingPage() {
 
   const features = [
     {
-      title: "AI-Powered Predictions",
+      title: "AI-Powered Analysis",
       description: "Advanced LSTM neural networks analyze years of market data to predict stock movements with precision.",
       icon: "🤖"
     },
@@ -98,13 +98,13 @@ export default function LandingPage() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 backdrop-blur-xl rounded-full border border-white/10 mb-8 animate-fade-in">
             <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            <span className="text-sm text-gray-300">146 predictions validated • 50% accuracy</span>
+            <span className="text-sm text-gray-300">146 analyses validated • 50% accuracy</span>
           </div>
 
           {/* Main headline */}
           <h1 className="text-6xl md:text-8xl font-bold mb-6 leading-tight animate-slide-up">
             <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-              Predict Markets
+              Analyze Markets
             </span>
             <br />
             <span className="text-white">With AI Precision</span>
@@ -113,13 +113,13 @@ export default function LandingPage() {
           {/* Subheadline */}
           <p className="text-xl md:text-2xl text-gray-400 mb-12 max-w-3xl mx-auto animate-slide-up-delay">
             Advanced LSTM neural networks analyze market patterns to give you an edge in stock trading.
-            Make informed decisions with real-time AI predictions.
+            Make informed decisions with real-time AI analysis.
           </p>
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16 animate-fade-in-delay">
             <Link to="/register" className="group px-8 py-4 bg-blue-500 rounded-full font-semibold text-lg hover:bg-blue-600 transition-all hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/50">
-              Start Predicting Free
+              Start Analyzing Free
               <span className="inline-block ml-2 group-hover:translate-x-1 transition-transform">→</span>
             </Link>
             <a href="#demo" className="px-8 py-4 bg-white/5 backdrop-blur-xl rounded-full font-semibold text-lg border border-white/10 hover:bg-white/10 transition-all hover:scale-105">
@@ -164,7 +164,7 @@ export default function LandingPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-purple-500 rounded-full" />
-                  <span>AI predictions</span>
+                  <span>AI analysis</span>
                 </div>
               </div>
             </div>
@@ -227,7 +227,7 @@ export default function LandingPage() {
               <div className="text-6xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent mb-4">
                 146+
               </div>
-              <div className="text-xl text-gray-300">Predictions Validated</div>
+              <div className="text-xl text-gray-300">Analyses Validated</div>
               <div className="text-sm text-gray-500 mt-2">Real-time accuracy tracking</div>
             </div>
             <div>
@@ -241,7 +241,7 @@ export default function LandingPage() {
               <div className="text-6xl font-bold bg-gradient-to-r from-pink-400 to-blue-400 bg-clip-text text-transparent mb-4">
                 50%
               </div>
-              <div className="text-xl text-gray-300">Prediction Accuracy</div>
+              <div className="text-xl text-gray-300">Analysis Accuracy</div>
               <div className="text-sm text-gray-500 mt-2">Continuously improving</div>
             </div>
           </div>
@@ -262,7 +262,7 @@ export default function LandingPage() {
             {[
               { step: "01", title: "Create Account", desc: "Sign up free in seconds. No credit card required." },
               { step: "02", title: "Search Stocks", desc: "Browse 1000+ stocks with real-time data and AI insights." },
-              { step: "03", title: "Get Predictions", desc: "Receive AI-powered predictions and make informed trades." }
+              { step: "03", title: "Get Analysis", desc: "Receive AI-powered analysis and make informed trades." }
             ].map((item, i) => (
               <div key={i} className="relative">
                 <div className="text-8xl font-bold text-white/5 mb-4">{item.step}</div>
@@ -285,7 +285,7 @@ export default function LandingPage() {
           <h2 className="text-5xl md:text-7xl font-bold mb-6">
             Ready to start <br />
             <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-              predicting?
+              analyzing?
             </span>
           </h2>
           <p className="text-xl text-gray-400 mb-12">

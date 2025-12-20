@@ -8,6 +8,7 @@ from flask import Blueprint, jsonify
 import yfinance as yf
 from datetime import datetime
 import pytz
+from services.commodity_fetcher import CommodityPriceFetcher
 
 market_bp = Blueprint('market', __name__)
 
@@ -95,10 +96,13 @@ def get_market_data():
 @market_bp.route('/indices', methods=['GET'])
 def get_market_indices():
     """
-    Get real-time market indices including NIFTY, SENSEX, Gold, and Silver
+    Get real-time market indices including NIFTY, SENSEX, Gold (22k & 24k), and Silver
     Returns comprehensive market data for ticker display
     """
     try:
+        # Initialize commodity fetcher
+        commodity_fetcher = CommodityPriceFetcher()
+
         # Fetch NIFTY 50
         nifty = yf.Ticker("^NSEI")
         nifty_hist = nifty.history(period='2d')
@@ -107,13 +111,8 @@ def get_market_indices():
         sensex = yf.Ticker("^BSESN")
         sensex_hist = sensex.history(period='2d')
 
-        # Fetch Gold (GC=F is Gold Futures in USD/oz)
-        gold = yf.Ticker("GC=F")
-        gold_hist = gold.history(period='2d')
-
-        # Fetch Silver (SI=F is Silver Futures in USD/oz)
-        silver = yf.Ticker("SI=F")
-        silver_hist = silver.history(period='2d')
+        # Fetch Gold and Silver from reliable Indian sources
+        commodity_data = commodity_fetcher.get_gold_silver_prices()
 
         # Helper function to calculate change
         def calculate_change(data):
@@ -146,24 +145,10 @@ def get_market_indices():
         # Calculate SENSEX
         sensex_data = calculate_change(sensex_hist)
 
-        # Calculate Gold (convert from USD/oz to INR/10g)
-        # 1 troy ounce = 31.1035 grams
-        # Current USD to INR rate (approximate - you can use a live API)
-        usd_to_inr = 83.0  # Update this with live rate if needed
-        gold_raw = calculate_change(gold_hist)
-        gold_data = {
-            'value': round(gold_raw['value'] * usd_to_inr / 31.1035 * 10, 0),  # Per 10 grams
-            'change': round(gold_raw['change'] * usd_to_inr / 31.1035 * 10, 0),
-            'changePercent': gold_raw['changePercent']
-        }
-
-        # Calculate Silver (convert from USD/oz to INR/kg)
-        silver_raw = calculate_change(silver_hist)
-        silver_data = {
-            'value': round(silver_raw['value'] * usd_to_inr / 31.1035 * 1000, 0),  # Per kilogram
-            'change': round(silver_raw['change'] * usd_to_inr / 31.1035 * 1000, 0),
-            'changePercent': silver_raw['changePercent']
-        }
+        # Use commodity data for gold and silver
+        gold_24k_data = commodity_data.get('gold_24k', {'value': 62450, 'change': 0, 'changePercent': 0})
+        gold_22k_data = commodity_data.get('gold_22k', {'value': 57329, 'change': 0, 'changePercent': 0})
+        silver_data = commodity_data.get('silver', {'value': 74320, 'change': 0, 'changePercent': 0})
 
         # Get current timestamp in IST
         ist = pytz.timezone('Asia/Kolkata')
@@ -172,9 +157,11 @@ def get_market_indices():
         return jsonify({
             'nifty': nifty_data,
             'sensex': sensex_data,
-            'gold': gold_data,
+            'gold_24k': gold_24k_data,
+            'gold_22k': gold_22k_data,
             'silver': silver_data,
             'timestamp': now_ist.isoformat(),
+            'source': commodity_data.get('source', 'Multiple Sources'),
             'currency': {
                 'gold': 'INR per 10g',
                 'silver': 'INR per kg'

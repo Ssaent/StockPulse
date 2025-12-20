@@ -1,4 +1,4 @@
-"""Advanced feature engineering for stock prediction"""
+"""Advanced feature engineering for stock analysis"""
 import pandas as pd
 import numpy as np
 import ta

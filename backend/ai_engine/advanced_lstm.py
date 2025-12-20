@@ -151,7 +151,7 @@ class AdvancedStockPredictor:
         scaled_data = self.scaler.transform(df[feature_cols].tail(self.sequence_length))
         X = scaled_data.reshape(1, self.sequence_length, len(feature_cols))
 
-        # Base prediction
+        # Base analysis
         pred_scaled = self.model.predict(X, verbose=0)[0][0]
 
         # Inverse transform
@@ -159,11 +159,11 @@ class AdvancedStockPredictor:
         dummy[0, feature_cols.index('Close')] = pred_scaled
         pred_price = self.scaler.inverse_transform(dummy)[0, feature_cols.index('Close')]
 
-        # Calculate predictions for different timeframes
-        predictions = {}
+        # Calculate analyses for different timeframes
+        analyses = {}
 
         # Monte Carlo simulation for confidence
-        mc_predictions = []
+        mc_analyses = []
         for _ in range(50):
             # Add noise to input
             noise = np.random.normal(0, 0.01, X.shape)
@@ -173,17 +173,17 @@ class AdvancedStockPredictor:
             dummy = np.zeros((1, len(feature_cols)))
             dummy[0, feature_cols.index('Close')] = pred
             price = self.scaler.inverse_transform(dummy)[0, feature_cols.index('Close')]
-            mc_predictions.append(price)
+            mc_analyses.append(price)
 
         # Calculate confidence from MC simulation
-        std = np.std(mc_predictions)
+        std = np.std(mc_analyses)
         confidence = max(60, min(95, int(100 * (1 - std / current_price))))
 
         # Intraday (1 day)
         intraday_pred = pred_price
         intraday_change = ((intraday_pred - current_price) / current_price) * 100
 
-        predictions['intraday'] = {
+        analyses['intraday'] = {
             'target': round(float(intraday_pred), 2),
             'change': round(float(intraday_change), 2),
             'confidence': confidence
@@ -194,7 +194,7 @@ class AdvancedStockPredictor:
         weekly_pred = current_price * (1 + recent_momentum * 5)
         weekly_change = ((weekly_pred - current_price) / current_price) * 100
 
-        predictions['weekly'] = {
+        analyses['weekly'] = {
             'target': round(float(weekly_pred), 2),
             'change': round(float(weekly_change), 2),
             'confidence': max(65, confidence - 5)
@@ -204,7 +204,7 @@ class AdvancedStockPredictor:
         monthly_pred = current_price * (1 + recent_momentum * 20)
         monthly_change = ((monthly_pred - current_price) / current_price) * 100
 
-        predictions['monthly'] = {
+        analyses['monthly'] = {
             'target': round(float(monthly_pred), 2),
             'change': round(float(monthly_change), 2),
             'confidence': max(60, confidence - 10)
@@ -215,13 +215,13 @@ class AdvancedStockPredictor:
         longterm_pred = current_price * (1 + long_momentum * 6)
         longterm_change = ((longterm_pred - current_price) / current_price) * 100
 
-        predictions['longterm'] = {
+        analyses['longterm'] = {
             'target': round(float(longterm_pred), 2),
             'change': round(float(longterm_change), 2),
             'confidence': max(55, confidence - 20)
         }
 
-        return predictions
+        return analyses
 
     def save_model(self, symbol):
         """Save model and scaler"""

@@ -5,7 +5,7 @@ Resolves timezone comparison issues and improves price matching
 
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
-from database.models import db, PredictionLog
+from database.models import db, AnalysisLog
 import pandas as pd
 import yfinance as yf
 
@@ -29,49 +29,49 @@ except ImportError:
 
 
 class BacktestingEngine:
-    """Engine for validating AI predictions against actual market data"""
+    """Engine for validating AI analyses against actual market data"""
 
     def __init__(self):
         self.price_fetcher = StockPriceFetcher()
 
-    def validate_predictions(self) -> int:
+    def validate_analyses(self) -> int:
         """
-        Validate all pending predictions whose target date has passed
-        Returns number of predictions validated
+        Validate all pending analyses whose target date has passed
+        Returns number of analyses validated
         """
         now = datetime.now()
 
         # ✅ Use db imported in this method
-        pending = db.session.query(PredictionLog).filter(
-            PredictionLog.is_validated == False,
-            PredictionLog.target_date <= now
+        pending = db.session.query(AnalysisLog).filter(
+            AnalysisLog.is_validated == False,
+            AnalysisLog.target_date <= now
         ).all()
 
-        print(f"Validating {len(pending)} predictions...")
+        print(f"Validating {len(pending)} analyses...")
         validated_count = 0
 
-        for prediction in pending:
+        for analysis in pending:
             try:
                 # Get actual price at target date
                 actual_price = self._get_price_at_date(
-                    prediction.symbol,
-                    prediction.exchange,
-                    prediction.target_date
+                    analysis.symbol,
+                    analysis.exchange,
+                    analysis.target_date
                 )
 
                 if actual_price is None:
-                    print(f"⚠️ Could not get price for {prediction.symbol} at {prediction.target_date}")
+                    print(f"⚠️ Could not get price for {analysis.symbol} at {analysis.target_date}")
                     continue
 
                 # Calculate actual change
                 actual_change_pct = (
-                    (actual_price - prediction.current_price_at_prediction) /
-                    prediction.current_price_at_prediction * 100
+                    (actual_price - analysis.current_price_at_prediction) /
+                    analysis.current_price_at_prediction * 100
                 )
 
-                # Determine if prediction was accurate
-                # Prediction is "accurate" if direction (up/down) was correct
-                predicted_direction = 1 if prediction.predicted_change_pct > 0 else -1
+                # Determine if analysis was accurate
+                # Analysis is "accurate" if direction (up/down) was correct
+                predicted_direction = 1 if analysis.predicted_change_pct > 0 else -1
                 actual_direction = 1 if actual_change_pct > 0 else -1
                 is_accurate = predicted_direction == actual_direction
 
@@ -79,26 +79,26 @@ class BacktestingEngine:
                 # Assuming 5% stop loss
                 profit_pct = actual_change_pct if is_accurate else max(actual_change_pct, -5.0)
 
-                # Update prediction record
-                prediction.actual_price = actual_price
-                prediction.actual_change_pct = round(actual_change_pct, 2)
-                prediction.is_accurate = is_accurate
-                prediction.profit_loss_pct = round(profit_pct, 2)
-                prediction.is_validated = True
-                prediction.validated_at = datetime.now()
+                # Update analysis record
+                analysis.actual_price = actual_price
+                analysis.actual_change_pct = round(actual_change_pct, 2)
+                analysis.is_accurate = is_accurate
+                analysis.profit_loss_pct = round(profit_pct, 2)
+                analysis.is_validated = True
+                analysis.validated_at = datetime.now()
 
                 db.session.commit()
                 validated_count += 1
 
                 accuracy_symbol = "✅" if is_accurate else "❌"
-                print(f"{accuracy_symbol} {prediction.symbol}: Predicted {prediction.predicted_change_pct:+.2f}%, Actual {actual_change_pct:+.2f}%")
+                print(f"{accuracy_symbol} {analysis.symbol}: Predicted {analysis.predicted_change_pct:+.2f}%, Actual {actual_change_pct:+.2f}%")
 
             except Exception as e:
-                print(f"❌ Error validating {prediction.symbol}: {e}")
+                print(f"❌ Error validating {analysis.symbol}: {e}")
                 db.session.rollback()
                 continue
 
-        print(f"\n✅ Validated {validated_count} predictions")
+        print(f"\n✅ Validated {validated_count} analyses")
         return validated_count
 
     def _get_price_at_date(self, symbol: str, exchange: str, target_date: datetime) -> Optional[float]:
@@ -173,7 +173,7 @@ class BacktestingEngine:
 
     def get_accuracy_stats(self, days: int = 30, timeframe: Optional[str] = None) -> Dict:
         """
-        Get accuracy statistics for validated predictions
+        Get accuracy statistics for validated analyses
 
         Args:
             days: Look back period in days
@@ -184,18 +184,18 @@ class BacktestingEngine:
         """
         cutoff_date = datetime.now() - timedelta(days=days)
 
-        # ✅ Use db.session.query instead of global PredictionLog.query
-        query = db.session.query(PredictionLog).filter(
-            PredictionLog.is_validated == True,
-            PredictionLog.validated_at >= cutoff_date
+        # ✅ Use db.session.query instead of global AnalysisLog.query
+        query = db.session.query(AnalysisLog).filter(
+            AnalysisLog.is_validated == True,
+            AnalysisLog.validated_at >= cutoff_date
         )
 
         if timeframe:
-            query = query.filter(PredictionLog.timeframe == timeframe)
+            query = query.filter(AnalysisLog.timeframe == timeframe)
 
-        predictions = query.all()
+        analyses = query.all()
 
-        if not predictions:
+        if not analyses:
             return {
                 'total': 0,
                 'accurate': 0,
@@ -206,14 +206,14 @@ class BacktestingEngine:
                 'by_timeframe': {}
             }
 
-        total = len(predictions)
-        accurate = sum(1 for p in predictions if p.is_accurate)
-        profitable = sum(1 for p in predictions if p.profit_loss_pct > 0)
-        total_profit = sum(p.profit_loss_pct for p in predictions)
+        total = len(analyses)
+        accurate = sum(1 for p in analyses if p.is_accurate)
+        profitable = sum(1 for p in analyses if p.profit_loss_pct > 0)
+        total_profit = sum(p.profit_loss_pct for p in analyses)
 
         # Group by timeframe
         by_timeframe = {}
-        for p in predictions:
+        for p in analyses:
             tf = p.timeframe
             if tf not in by_timeframe:
                 by_timeframe[tf] = {
@@ -242,36 +242,36 @@ class BacktestingEngine:
             'by_timeframe': by_timeframe
         }
 
-    def get_prediction_history(
+    def get_analysis_history(
         self,
         limit: int = 50,
         timeframe: Optional[str] = None
     ) -> List[Dict]:
         """
-        Get recent validated predictions with details
+        Get recent validated analyses with details
 
         Args:
-            limit: Maximum number of predictions to return
+            limit: Maximum number of analyses to return
             timeframe: Filter by timeframe
 
         Returns:
-            List of prediction dictionaries
+            List of analysis dictionaries
         """
-        # Use global db and PredictionLog imported at module level
-        query = db.session.query(PredictionLog).filter(
-            PredictionLog.is_validated == True
-        ).order_by(PredictionLog.validated_at.desc())
+        # Use global db and AnalysisLog imported at module level
+        query = db.session.query(AnalysisLog).filter(
+            AnalysisLog.is_validated == True
+        ).order_by(AnalysisLog.validated_at.desc())
 
         if timeframe:
-            query = query.filter(PredictionLog.timeframe == timeframe)
+            query = query.filter(AnalysisLog.timeframe == timeframe)
 
-        predictions = query.limit(limit).all()
+        analyses = query.limit(limit).all()
 
         return [
             {
                 'symbol': p.symbol,
                 'exchange': p.exchange,
-                'prediction_date': p.prediction_date.isoformat(),
+                'analysis_date': p.prediction_date.isoformat(),
                 'target_date': p.target_date.isoformat(),
                 'timeframe': p.timeframe,
                 'predicted_price': p.predicted_price,
@@ -283,5 +283,9 @@ class BacktestingEngine:
                 'confidence': p.confidence,
                 'validated_at': p.validated_at.isoformat() if p.validated_at else None
             }
-            for p in predictions
+            for p in analyses
         ]
+
+    def get_recent_analyses(self, limit: int = 50, timeframe: Optional[str] = None) -> List[Dict]:
+        """Alias for get_analysis_history for backward compatibility"""
+        return self.get_analysis_history(limit, timeframe)

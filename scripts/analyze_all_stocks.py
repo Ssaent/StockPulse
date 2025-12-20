@@ -1,7 +1,7 @@
 """
 STOCKPULSE - PRODUCTION READY
 Analyzes NIFTY 50 + Mid-cap + Small-cap stocks
-Generates real AI predictions for production use
+Generates real AI analyses for production use
 """
 
 import sys
@@ -74,8 +74,8 @@ def get_smallcap_stocks():
     ]
     return [{'symbol': s, 'category': 'SMALL CAP'} for s in random.sample(smallcaps, 50)]
 
-def verify_prediction_quality(predicted_price, current_price, confidence):
-    """Verify prediction quality"""
+def verify_analysis_quality(predicted_price, current_price, confidence):
+    """Verify analysis quality"""
     if predicted_price == 0 or current_price == 0:
         return False, "Zero price detected"
 
@@ -90,7 +90,7 @@ def verify_prediction_quality(predicted_price, current_price, confidence):
     if confidence < 50:
         return False, f"Confidence too low: {confidence}%"
 
-    return True, f"Valid prediction: {change_pct:+.2f}%"
+    return True, f"Valid analysis: {change_pct:+.2f}%"
 
 def analyze_stock(symbol, category, predictor, cursor):
     """Analyze stock and save directly to SQLite"""
@@ -114,29 +114,29 @@ def analyze_stock(symbol, category, predictor, cursor):
             print(f"❌ Invalid price: ₹{current_price}")
             return 0
 
-        # Generate predictions
-        print(f"🤖 Generating predictions...")
-        predictions = {
+        # Generate analyses
+        print(f"🤖 Generating analyses...")
+        analyses = {
             'intraday': predictor.predict(symbol, 'intraday'),
             'weekly': predictor.predict(symbol, 'weekly'),
             'monthly': predictor.predict(symbol, 'monthly')
         }
 
-        valid_predictions = 0
+        valid_analyses = 0
 
-        for timeframe, pred_data in predictions.items():
-            predicted_price = pred_data['predicted_price']
-            confidence = pred_data['confidence']
+        for timeframe, analysis_data in analyses.items():
+            predicted_price = analysis_data['predicted_price']
+            confidence = analysis_data['confidence']
 
             change_pct = ((predicted_price - current_price) / current_price) * 100
 
-            is_valid, message = verify_prediction_quality(predicted_price, current_price, confidence)
+            is_valid, message = verify_analysis_quality(predicted_price, current_price, confidence)
 
             status = "✅" if is_valid else "⚠️"
             print(f"{status} {timeframe.upper():8} → ₹{predicted_price:.2f} ({change_pct:+.2f}%) | Conf: {confidence}% | {message}")
 
             if is_valid:
-                valid_predictions += 1
+                valid_analyses += 1
 
                 # Calculate target date
                 if timeframe == 'intraday':
@@ -161,7 +161,7 @@ def analyze_stock(symbol, category, predictor, cursor):
                     'v3.0', 28, False
                 ))
 
-        return valid_predictions
+        return valid_analyses
 
     except Exception as e:
         print(f"❌ Error analyzing {symbol}: {str(e)}")
@@ -231,7 +231,7 @@ def main():
 
         # Commit all changes
         conn.commit()
-        print("\n✅ All predictions saved to database!")
+        print("\n✅ All analyses saved to database!")
         
         # Final summary
         total_success = sum(results.values())
@@ -247,9 +247,9 @@ def main():
 
         # Database summary
         cursor.execute("SELECT COUNT(*) FROM prediction_logs")
-        total_predictions = cursor.fetchone()[0]
+        total_analyses = cursor.fetchone()[0]
         print(f"\n💾 Database Status:")
-        print(f"  Total Predictions: {total_predictions}")
+        print(f"  Total Analyses: {total_analyses}")
 
         # Timeframe breakdown
         cursor.execute("SELECT timeframe, COUNT(*) FROM prediction_logs GROUP BY timeframe")
@@ -258,8 +258,8 @@ def main():
             print(f"  {timeframe.upper()}: {count}")
 
         print(f"\n🎯 PRODUCTION COMPLETE!")
-        print(f"  Users can now see {total_predictions} AI predictions on the dashboard")
-        print(f"  Predictions will be validated automatically over time")
+        print(f"  Users can now see {total_analyses} AI analyses on the dashboard")
+        print(f"  Analyses will be validated automatically over time")
         print(f"  View accuracy: http://localhost:5173/backtesting")
 
         print("\n" + "="*60)

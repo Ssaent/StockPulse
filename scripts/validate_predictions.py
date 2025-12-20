@@ -1,6 +1,6 @@
 """
 Production Validation Script - Real Market Price Validation
-Fetches actual prices from Yahoo Finance to validate predictions
+Fetches actual prices from Yahoo Finance to validate analyses
 """
 
 import sys
@@ -74,8 +74,8 @@ def get_actual_price_at_date(symbol, target_date):
         print(f"❌ Error fetching price for {symbol}: {e}")
         return None
 
-def validate_predictions():
-    """Validate predictions against real market data"""
+def validate_analyses():
+    """Validate analyses against real market data"""
     db_path = get_db_path()
     
     if not os.path.exists(db_path):
@@ -88,21 +88,21 @@ def validate_predictions():
     cursor = conn.cursor()
     
     try:
-        # Get pending predictions
+        # Get pending analyses
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         cursor.execute("""
             SELECT id, symbol, exchange, target_date, predicted_change_pct, current_price_at_prediction
             FROM prediction_logs
             WHERE is_validated = 0 AND target_date <= ?
         """, (now,))
-        
+
         pending = cursor.fetchall()
-        print(f"🎯 Found {len(pending)} predictions ready for validation")
+        print(f"🎯 Found {len(pending)} analyses ready for validation")
         
         validated_count = 0
         
-        for pred in pending:
-            pred_id, symbol, exchange, target_date_str, predicted_change, current_price = pred
+        for analysis in pending:
+            analysis_id, symbol, exchange, target_date_str, predicted_change, current_price = analysis
             
             # Parse target date with microseconds handling
             try:
@@ -135,7 +135,7 @@ def validate_predictions():
                 else:
                     profit_pct = max(actual_change, -5.0)  # Stop loss at -5%
                 
-                # Update the prediction
+                # Update the analysis
                 cursor.execute("""
                     UPDATE prediction_logs
                     SET actual_price = ?,
@@ -145,7 +145,7 @@ def validate_predictions():
                         is_validated = 1,
                         validated_at = ?
                     WHERE id = ?
-                """, (actual_price, round(actual_change, 2), is_accurate, round(profit_pct, 2), now, pred_id))
+                """, (actual_price, round(actual_change, 2), is_accurate, round(profit_pct, 2), now, analysis_id))
                 
                 accuracy_icon = "✅" if is_accurate else "❌"
                 print(f"{accuracy_icon} {symbol}: Predicted {predicted_change:+.2f}%, Actual {actual_change:+.2f}%")
@@ -178,7 +178,7 @@ def get_stats():
     cursor = conn.cursor()
     
     try:
-        # Get total validated predictions
+        # Get total validated analyses
         cursor.execute("SELECT COUNT(*) FROM prediction_logs WHERE is_validated = 1")
         total = cursor.fetchone()[0]
         
@@ -189,7 +189,7 @@ def get_stats():
         cursor.execute("SELECT COUNT(*) FROM prediction_logs WHERE is_validated = 1 AND is_accurate = 1")
         accurate = cursor.fetchone()[0]
         
-        # Get win rate (profitable predictions)
+        # Get win rate (profitable analyses)
         cursor.execute("SELECT COUNT(*) FROM prediction_logs WHERE is_validated = 1 AND profit_loss_pct > 0")
         profitable = cursor.fetchone()[0]
         
@@ -240,8 +240,8 @@ def main():
     print(f"{'='*60}\n")
     
     try:
-        # Validate predictions against real market data
-        count = validate_predictions()
+        # Validate analyses against real market data
+        count = validate_analyses()
         
         # Get statistics
         stats = get_stats()
@@ -250,8 +250,8 @@ def main():
         print(f"\n{'='*60}")
         print("VALIDATION SUMMARY")
         print(f"{'='*60}")
-        print(f"Predictions Validated: {count}")
-        
+        print(f"Analyses Validated: {count}")
+
         if stats and stats.get('total', 0) > 0:
             print(f"\nOverall Statistics:")
             print(f"  Total Validated: {stats['total']}")
@@ -264,7 +264,7 @@ def main():
                 for tf, tf_stats in stats['timeframe_breakdown'].items():
                     print(f"  {tf.upper():8}: {tf_stats['accuracy_rate']}% accuracy, {tf_stats['avg_profit']:+.2f}% avg profit")
         else:
-            print("\nNo validated predictions yet")
+            print("\nNo validated analyses yet")
             
         print(f"{'='*60}\n")
         

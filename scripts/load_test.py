@@ -138,7 +138,7 @@ class LoadTester:
             print("⚠ Average response time > 5s")
             print("  - Cache historical data")
             print("  - Use async processing")
-            print("  - Pre-compute predictions")
+            print("  - Pre-compute analyses")
 
         if self.failure_count > self.target_users * 0.1:
             print("⚠ High failure rate")

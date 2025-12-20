@@ -39,7 +39,7 @@ export default function TermsOfService() {
 
             <h3 className="text-2xl font-bold text-white mb-4">3. Investment Disclaimer</h3>
             <p className="text-slate-300 mb-6">
-              StockPulse provides AI-powered stock predictions for informational purposes only. All investment decisions
+              StockPulse provides AI-powered stock analyses for informational purposes only. All investment decisions
               and responsibilities remain solely with the user. Past performance does not guarantee future results.
             </p>
 

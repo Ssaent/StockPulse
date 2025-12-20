@@ -321,7 +321,7 @@ def create_app(config_name=None):
                     return None
 
             feature_cols = predictor.feature_names
-            predictions = predictor.predict_multi_horizon(hist_data, feature_cols, current_price)
+            analysis = predictor.predict_multi_horizon(hist_data, feature_cols, current_price)
             signals = tech_analyzer.generate_signals(hist_data)
 
             import yfinance as yf
@@ -335,7 +335,7 @@ def create_app(config_name=None):
                 'currentPrice': round(current_price, 2),
                 'change': round(((current_price - prev_price) / prev_price) * 100, 2),
                 'changePercent': f"{round(((current_price - prev_price) / prev_price) * 100, 2)}%",
-                'predictions': predictions,
+                'analysis': analysis,
                 'model_trained': True,
                 'features_used': len(feature_cols),
                 'technical': {
@@ -365,7 +365,7 @@ def create_app(config_name=None):
             data = request.json
             if not data:
                 return jsonify({'error': 'Invalid request'}), 400
-            
+
             symbol = data.get('symbol', '').strip().upper()
             exchange = data.get('exchange', 'NSE').upper()
 
@@ -375,15 +375,15 @@ def create_app(config_name=None):
             result = get_cached_analysis(symbol, exchange)
             if result:
                 try:
-                    backtesting.log_prediction(
+                    backtesting.log_analysis(
                         symbol=symbol,
                         exchange=exchange,
-                        predictions=result['predictions'],
+                        analyses=result['analysis'],
                         current_price=result['currentPrice'],
                         model_info={'features_used': result.get('features_used', 28)}
                     )
                 except Exception as e:
-                    logger.error(f"Failed to log prediction: {e}", exc_info=True)
+                    logger.error(f"Failed to log analysis: {e}", exc_info=True)
 
                 return jsonify(result)
 
@@ -404,15 +404,15 @@ def create_app(config_name=None):
             result = get_cached_analysis(symbol, exchange)
             if result:
                 try:
-                    backtesting.log_prediction(
+                    backtesting.log_analysis(
                         symbol=symbol,
                         exchange=exchange,
-                        predictions=result['predictions'],
+                        analyses=result['analysis'],
                         current_price=result['currentPrice'],
                         model_info={'features_used': result.get('features_used', 28)}
                     )
                 except Exception as e:
-                    logger.error(f"Failed to log prediction: {e}", exc_info=True)
+                    logger.error(f"Failed to log analysis: {e}", exc_info=True)
 
                 return jsonify(result)
 
@@ -503,27 +503,27 @@ def create_app(config_name=None):
     @app.route('/api/backtest/recent', methods=['GET'])
     @limiter.limit("30 per minute")
     @jwt_required()
-    def get_recent_predictions():
-        """Get recent predictions"""
+    def get_recent_analyses():
+        """Get recent analyses"""
         try:
             limit = min(max(int(request.args.get('limit', 20)), 1), 100)  # Clamp 1-100
-            
-            predictions = backtesting.get_recent_predictions(limit)
-            return jsonify({'predictions': predictions, 'total': len(predictions)})
+
+            analyses = backtesting.get_recent_analyses(limit)
+            return jsonify({'analyses': analyses, 'total': len(analyses)})
         except ValueError:
             return jsonify({'error': 'Invalid limit parameter'}), 400
         except Exception as e:
-            logger.error(f"Recent predictions error: {e}", exc_info=True)
-            return jsonify({'error': 'Failed to fetch predictions'}), 500
+            logger.error(f"Recent analyses error: {e}", exc_info=True)
+            return jsonify({'error': 'Failed to fetch analyses'}), 500
 
     @app.route('/api/backtest/validate', methods=['POST'])
     @limiter.limit("5 per hour")
     @jwt_required()
-    def validate_predictions_now():
-        """Manually trigger prediction validation"""
+    def validate_analyses_now():
+        """Manually trigger analysis validation"""
         try:
-            count = backtesting.validate_predictions()
-            return jsonify({'message': f'Validated {count} predictions', 'count': count})
+            count = backtesting.validate_analyses()
+            return jsonify({'message': f'Validated {count} analyses', 'count': count})
         except Exception as e:
             logger.error(f"Validation error: {e}", exc_info=True)
             return jsonify({'error': 'Validation failed'}), 500
@@ -591,7 +591,7 @@ def create_app(config_name=None):
                 exchange=data.get('exchange', 'NSE').upper(),
                 analyzed_at=datetime.now(timezone.utc),
                 current_price=data.get('currentPrice', 0),
-                predictions=data.get('predictions', {}),
+                analysis=data.get('analysis', {}),
                 technical=data.get('technical', {})
             )
 

@@ -185,16 +185,16 @@ class SearchHistory(db.Model):
 # PREDICTION LOGS (BACKTESTING)
 # ============================================================
 
-class PredictionLog(db.Model):
-    """AI prediction logs for backtesting"""
-    __tablename__ = 'prediction_logs'
+class AnalysisLog(db.Model):
+    """AI analysis logs for backtesting"""
+    __tablename__ = 'prediction_logs'  # Keep table name for backward compatibility
 
     id = db.Column(db.Integer, primary_key=True)
     symbol = db.Column(db.String(20), nullable=False, index=True)
     exchange = db.Column(db.String(10), nullable=False)
 
-    # Prediction details
-    prediction_date = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+    # Analysis details
+    prediction_date = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)  # Keep column name for backward compatibility
     timeframe = db.Column(db.String(20), nullable=False)
     predicted_price = db.Column(db.Float, nullable=False)
     predicted_change_pct = db.Column(db.Float, nullable=False)
@@ -224,7 +224,7 @@ class PredictionLog(db.Model):
             'id': self.id,
             'symbol': self.symbol,
             'exchange': self.exchange,
-            'prediction_date': self.prediction_date.isoformat(),
+            'analysis_date': self.prediction_date.isoformat(),
             'timeframe': self.timeframe,
             'predicted_price': self.predicted_price,
             'predicted_change_pct': self.predicted_change_pct,
@@ -244,7 +244,7 @@ class PredictionLog(db.Model):
         }
 
     def __repr__(self):
-        return f'<PredictionLog {self.symbol} {self.timeframe} {self.prediction_date}>'
+        return f'<AnalysisLog {self.symbol} {self.timeframe} {self.prediction_date}>'
 
 
 # ============================================================
@@ -262,7 +262,7 @@ class AnalysisHistory(db.Model):
     exchange = db.Column(db.String(10), default='NSE')
     analyzed_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
     current_price = db.Column(db.Float, default=0)
-    predictions = db.Column(db.JSON)
+    analysis = db.Column(db.JSON)
     technical = db.Column(db.JSON)
 
     def to_dict(self):
@@ -274,7 +274,7 @@ class AnalysisHistory(db.Model):
             'exchange': self.exchange,
             'analyzed_at': self.analyzed_at.isoformat(),
             'currentPrice': self.current_price,
-            'predictions': self.predictions,
+            'analysis': self.analysis,
             'technical': self.technical
         }
 
@@ -357,3 +357,6 @@ class OnlineUser(db.Model):
 
     def __repr__(self):
         return f'<OnlineUser {self.user_id}>'
+
+# Alias for backward compatibility
+PredictionLog = AnalysisLog

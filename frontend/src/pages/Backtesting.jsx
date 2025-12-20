@@ -65,7 +65,7 @@ export default function Backtesting() {
         name: 'Reliance Industries',
         analyzedAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
         currentPrice: 2456.50,
-        predictions: {
+        analysis: {
           '1week': { target: 2520, change: 2.58, confidence: 72 },
           '1month': { target: 2610, change: 6.25, confidence: 68 },
           '3months': { target: 2750, change: 11.95, confidence: 65 },
@@ -83,7 +83,7 @@ export default function Backtesting() {
         name: 'Tata Consultancy Services',
         analyzedAt: new Date(now - 5 * 60 * 60 * 1000).toISOString(), // 5 hours ago
         currentPrice: 3542.80,
-        predictions: {
+        analysis: {
           '1week': { target: 3580, change: 1.05, confidence: 70 },
           '1month': { target: 3650, change: 3.03, confidence: 67 },
           '3months': { target: 3720, change: 5.00, confidence: 64 },
@@ -101,7 +101,7 @@ export default function Backtesting() {
         name: 'Infosys Limited',
         analyzedAt: new Date(now - 1 * 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
         currentPrice: 1456.20,
-        predictions: {
+        analysis: {
           '1week': { target: 1440, change: -1.11, confidence: 69 },
           '1month': { target: 1480, change: 1.63, confidence: 66 },
           '3months': { target: 1520, change: 4.38, confidence: 63 },
@@ -138,7 +138,7 @@ export default function Backtesting() {
     return date.toLocaleDateString();
   };
 
-  const getPredictionPeriodLabel = (period) => {
+  const getAnalysisPeriodLabel = (period) => {
     const labels = {
       '1week': '1 Week',
       '1month': '1 Month',
@@ -176,7 +176,7 @@ export default function Backtesting() {
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">
                   Analysis History
                 </h1>
-                <p className="text-sm text-gray-400">Track your stock predictions</p>
+                <p className="text-sm text-gray-400">Track your stock analyses</p>
               </div>
             </div>
 
@@ -244,7 +244,7 @@ export default function Backtesting() {
             <p className="text-gray-400 mb-6">
               {searchQuery
                 ? `No results found for "${searchQuery}"`
-                : 'Start analyzing stocks to see your prediction history'}
+                : 'Start analyzing stocks to see your analysis history'}
             </p>
             <Link
               to="/dashboard"
@@ -293,7 +293,7 @@ export default function Backtesting() {
 
                 {/* Predictions Grid */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                  {Object.entries(analysis.predictions).map(([period, pred]) => (
+                  {Object.entries(analysis.analysis).map(([period, pred]) => (
                     <div
                       key={period}
                       className="bg-white/5 rounded-xl p-4 border border-white/10"
@@ -301,7 +301,7 @@ export default function Backtesting() {
                       <div className="flex items-center gap-2 mb-2">
                         <Calendar className="w-4 h-4 text-blue-400" />
                         <span className="text-xs text-gray-400 uppercase">
-                          {getPredictionPeriodLabel(period)}
+                          {getAnalysisPeriodLabel(period)}
                         </span>
                       </div>
                       <div className="text-xl font-bold mb-1">₹{pred.target}</div>
@@ -365,8 +365,8 @@ export default function Backtesting() {
               <h4 className="font-semibold mb-2">About Analysis History</h4>
               <p className="text-sm text-gray-400 leading-relaxed">
                 Your analysis history shows all stocks you've analyzed with their AI-powered
-                predictions. Each entry includes price targets for different time periods and
-                technical indicators. Use this to track your prediction accuracy over time.
+                analysis. Each entry includes price targets for different time periods and
+                technical indicators. Use this to track your analysis accuracy over time.
               </p>
             </div>
           </div>

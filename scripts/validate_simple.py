@@ -35,7 +35,7 @@ if __name__ == '__main__':
         # Run validation
         with app.app_context():
             engine = BacktestingEngine()
-            count = engine.validate_predictions()
+            count = engine.validate_analyses()
             stats = engine.get_accuracy_stats(days=30)
 
             # Print results
@@ -57,7 +57,7 @@ if __name__ == '__main__':
                     for tf, tf_stats in stats['by_timeframe'].items():
                         print(f"  {tf.upper()}: {tf_stats['accuracy_rate']}% accuracy")
             else:
-                print("\nNo validated predictions yet")
+                print("\nNo validated analyses yet")
 
             print(f"{'=' * 60}\n")
 

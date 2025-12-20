@@ -177,7 +177,7 @@ export default function Dashboard() {
           name: res.data.name || res.data.symbol,
           exchange: res.data.exchange || 'NSE',
           currentPrice: res.data.currentPrice,
-          predictions: res.data.predictions,
+          analyses: res.data.analysis,
           technical: res.data.technical
         };
 
@@ -302,7 +302,7 @@ export default function Dashboard() {
         {/* Welcome - FIXED: Use username instead of email */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold mb-2">Welcome back, {user?.username || user?.name}!</h2>
-          <p className="text-gray-400">Search and analyze stocks with AI-powered predictions</p>
+          <p className="text-gray-400">Search and analyze stocks with AI-powered analyses</p>
         </div>
 
         {/* Quick Stats - RGV/Nolan Hybrid */}
@@ -489,7 +489,7 @@ export default function Dashboard() {
               <span className="text-gray-600">•</span>
               <span className="animate-pulse" style={{ animationDelay: '0.3s' }}>Training model</span>
               <span className="text-gray-600">•</span>
-              <span className="animate-pulse" style={{ animationDelay: '0.6s' }}>Generating predictions</span>
+              <span className="animate-pulse" style={{ animationDelay: '0.6s' }}>Generating analyses</span>
             </div>
 
             {/* Floating Percentage Numbers */}
@@ -551,9 +551,9 @@ export default function Dashboard() {
 
             {/* Predictions */}
             <RgvPanel>
-              <h4 className="text-xl font-bold mb-4">AI Predictions</h4>
+              <h4 className="text-xl font-bold mb-4">AI Analyses</h4>
               <div className="grid md:grid-cols-4 gap-4">
-                {Object.entries(selectedStock.predictions).map(([key, pred]) => (
+                {Object.entries(selectedStock.analyses).map(([key, pred]) => (
                   <div key={key} className="rounded-xl border border-white/10 bg-white/5 p-4">
                     <div className="text-sm text-gray-400 uppercase mb-2">{key}</div>
                     <div className="text-2xl font-bold mb-1">₹{pred.target}</div>
@@ -580,7 +580,7 @@ export default function Dashboard() {
             {/* Price Chart */}
             <RgvPanel>
               <StockChart
-                predictions={selectedStock.predictions}
+                analyses={selectedStock.analysis}
                 currentPrice={selectedStock.currentPrice}
                 symbol={selectedStock.symbol}
               />

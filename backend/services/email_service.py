@@ -269,8 +269,8 @@ class EmailService:
                     </div>
                     
                     <div class="feature">
-                        <strong>🔮 Price Predictions</strong>
-                        LSTM-powered predictions for intraday, weekly, monthly, and long-term timeframes.
+                        <strong>🔮 Price Analyses</strong>
+                        LSTM-powered analyses for intraday, weekly, monthly, and long-term timeframes.
                     </div>
                     
                     <div class="feature">

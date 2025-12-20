@@ -80,7 +80,7 @@ def save_analysis():
             'exchange': data.get('exchange', 'NSE'),
             'analyzed_at': datetime.utcnow(),
             'currentPrice': data.get('currentPrice', 0),
-            'predictions': data.get('predictions', {}),
+            'analysis': data.get('analysis', {}),
             'technical': data.get('technical', {})
         }
 

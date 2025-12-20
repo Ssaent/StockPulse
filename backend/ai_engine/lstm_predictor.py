@@ -1,4 +1,4 @@
-"""AI Prediction Engine"""
+"""AI Analysis Engine"""
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 
@@ -8,7 +8,7 @@ class LSTMPredictor:
         self.scaler = MinMaxScaler()
 
     def predict_multi_horizon(self, df, current_price):
-        """Generate predictions for multiple timeframes"""
+        """Generate analyses for multiple timeframes"""
 
         # Calculate statistics
         returns = df['Close'].pct_change().dropna()
@@ -19,14 +19,14 @@ class LSTMPredictor:
         recent_returns = df['Close'].tail(30).pct_change().dropna()
         recent_trend = recent_returns.mean()
 
-        predictions = {
+        analyses = {
             'intraday': self._predict_timeframe(current_price, trend, volatility, 1, df),
             'weekly': self._predict_timeframe(current_price, trend, volatility, 5, df),
             'monthly': self._predict_timeframe(current_price, recent_trend, volatility, 20, df),
             'longterm': self._predict_timeframe(current_price, recent_trend, volatility, 120, df)
         }
 
-        return predictions
+        return analyses
 
     def _predict_timeframe(self, current, trend, vol, days, df):
         """Predict for specific timeframe"""

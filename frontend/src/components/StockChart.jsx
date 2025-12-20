@@ -123,14 +123,14 @@ const rgvLineGlow = {
 
 ChartJS.register(rgvBackground, rgvLineGlow);
 
-export default function StockChart({ predictions, currentPrice, symbol }) {
+export default function StockChart({ analysis, currentPrice, symbol }) {
   const labels = ['Current', 'Intraday', 'Weekly', 'Monthly', 'Long-term'];
   const values = [
     currentPrice,
-    predictions.intraday.target,
-    predictions.weekly.target,
-    predictions.monthly.target,
-    predictions.longterm.target
+    analysis.intraday.target,
+    analysis.weekly.target,
+    analysis.monthly.target,
+    analysis.longterm.target
   ];
 
   // Crimson current point, toxic-green projections
@@ -146,7 +146,7 @@ export default function StockChart({ predictions, currentPrice, symbol }) {
     labels,
     datasets: [
       {
-        label: 'Price Prediction',
+        label: 'Price Analysis',
         data: values,
         borderColor: 'rgba(34,197,94,0.95)', // neon green
         backgroundColor: (ctx) => {
@@ -175,7 +175,7 @@ export default function StockChart({ predictions, currentPrice, symbol }) {
       }
     ]
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [currentPrice, predictions]);
+  }), [currentPrice, analysis]);
 
   const options = useMemo(() => ({
     responsive: true,

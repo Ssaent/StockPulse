@@ -1,5 +1,5 @@
 """
-Fixed AI Predictor Service - Ensures Real Predictions
+Fixed AI Predictor Service - Ensures Real Analyses
 Problem: Model was outputting 0.00% predictions
 Solution: Proper price scaling and prediction calculation
 """

@@ -1,5 +1,5 @@
 """
-Quick database inspector to check prediction data before validation
+Quick database inspector to check analysis data before validation
 """
 import sys
 import os
@@ -44,10 +44,10 @@ def inspect_database():
     cursor = conn.cursor()
 
     try:
-        # Check total predictions
+        # Check total analyses
         cursor.execute("SELECT COUNT(*) FROM prediction_logs")
-        total_predictions = cursor.fetchone()[0]
-        print(f"📊 Total Predictions: {total_predictions}")
+        total_analyses = cursor.fetchone()[0]
+        print(f"📊 Total Analyses: {total_analyses}")
 
         # Check validated vs unvalidated
         cursor.execute("SELECT COUNT(*) FROM prediction_logs WHERE is_validated = 1")
@@ -70,15 +70,15 @@ def inspect_database():
         print(f"🎯 Ready for Validation: {pending}")
 
         if pending > 0:
-            print(f"\n📋 Sample pending predictions:")
+            print(f"\n📋 Sample pending analyses:")
             cursor.execute("""
                 SELECT symbol, exchange, target_date FROM prediction_logs
                 WHERE is_validated = 0 AND target_date <= ?
                 LIMIT 5
             """, (now,))
-            pending_preds = cursor.fetchall()
+            pending_analyses = cursor.fetchall()
 
-            for pred in pending_preds:
+            for analysis in pending_analyses:
                 symbol, exchange, target_date = pred
                 days_overdue = (datetime.now() - datetime.strptime(target_date, '%Y-%m-%d %H:%M:%S')).days
                 print(f"  - {symbol} ({exchange}) - {target_date.split(' ')[0]} ({days_overdue}d overdue)")
@@ -96,11 +96,11 @@ def inspect_database():
         recent = cursor.fetchall()
 
         if recent:
-            print(f"\n🕒 Recent Predictions:")
-            for pred in recent:
-                symbol, is_validated, pred_date = pred
+            print(f"\n🕒 Recent Analyses:")
+            for analysis in recent:
+                symbol, is_validated, analysis_date = analysis
                 status = "✅" if is_validated else "⏳"
-                print(f"  {status} {symbol} - {pred_date.split(' ')[0] if pred_date else 'N/A'}")
+                print(f"  {status} {symbol} - {analysis_date.split(' ')[0] if analysis_date else 'N/A'}")
 
         print(f"\n{'='*60}")
 

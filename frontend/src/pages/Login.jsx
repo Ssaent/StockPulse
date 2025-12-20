@@ -12,7 +12,8 @@ export default function Login() {
   const [marketData, setMarketData] = useState({
     nifty50: { value: '---', change: '+0.00', changePercent: '+0.00%', isPositive: true },
     sensex: { value: '---', change: '+0.00', changePercent: '+0.00%', isPositive: true },
-    gold: { value: '---', change: '+0', changePercent: '+0.00%', isPositive: true },
+    gold24k: { value: '---', change: '+0', changePercent: '+0.00%', isPositive: true },
+    gold22k: { value: '---', change: '+0', changePercent: '+0.00%', isPositive: true },
     silver: { value: '---', change: '0', changePercent: '0.00%', isPositive: false }
   });
 
@@ -26,7 +27,7 @@ export default function Login() {
         const indicesResponse = await axios.get('http://localhost:5000/api/market/indices');
 
         if (indicesResponse.data) {
-          const { nifty, sensex, gold, silver } = indicesResponse.data;
+          const { nifty, sensex, gold_24k, gold_22k, silver } = indicesResponse.data;
 
           setMarketData({
             nifty50: {
@@ -41,14 +42,20 @@ export default function Login() {
               changePercent: sensex?.changePercent >= 0 ? `+${sensex?.changePercent.toFixed(2)}%` : `${sensex?.changePercent.toFixed(2)}%`,
               isPositive: sensex?.change >= 0
             },
-            gold: {
-              value: gold?.value?.toFixed(0) || '62,450',
-              change: gold?.change >= 0 ? `+${gold?.change.toFixed(0)}` : gold?.change.toFixed(0),
-              changePercent: gold?.changePercent >= 0 ? `+${gold?.changePercent.toFixed(2)}%` : `${gold?.changePercent.toFixed(2)}%`,
-              isPositive: gold?.change >= 0
+            gold24k: {
+              value: gold_24k?.value?.toLocaleString('en-IN') || '62,450',
+              change: gold_24k?.change >= 0 ? `+${gold_24k?.change.toFixed(0)}` : gold_24k?.change.toFixed(0),
+              changePercent: gold_24k?.changePercent >= 0 ? `+${gold_24k?.changePercent.toFixed(2)}%` : `${gold_24k?.changePercent.toFixed(2)}%`,
+              isPositive: gold_24k?.change >= 0
+            },
+            gold22k: {
+              value: gold_22k?.value?.toLocaleString('en-IN') || '57,329',
+              change: gold_22k?.change >= 0 ? `+${gold_22k?.change.toFixed(0)}` : gold_22k?.change.toFixed(0),
+              changePercent: gold_22k?.changePercent >= 0 ? `+${gold_22k?.changePercent.toFixed(2)}%` : `${gold_22k?.changePercent.toFixed(2)}%`,
+              isPositive: gold_22k?.change >= 0
             },
             silver: {
-              value: silver?.value?.toFixed(0) || '74,320',
+              value: silver?.value?.toLocaleString('en-IN') || '74,320',
               change: silver?.change >= 0 ? `+${silver?.change.toFixed(0)}` : silver?.change.toFixed(0),
               changePercent: silver?.changePercent >= 0 ? `+${silver?.changePercent.toFixed(2)}%` : `${silver?.changePercent.toFixed(2)}%`,
               isPositive: silver?.change >= 0
@@ -103,8 +110,8 @@ export default function Login() {
       <div className="absolute top-0 left-0 right-0 bg-slate-900/80 backdrop-blur-sm border-b border-slate-800 z-20 py-3 overflow-hidden">
         <div className="ticker-wrapper">
           <div className="ticker-content">
-            {/* Triple repeat for seamless infinite scroll */}
-            {[1, 2, 3].map((set) => (
+            {/* Six repeats for smoother infinite scroll */}
+            {[1, 2, 3, 4, 5, 6].map((set) => (
               <div key={set} className="ticker-item-group">
                 <div className="ticker-item">
                   <span className="text-slate-400 font-semibold text-sm">NIFTY 50</span>
@@ -123,11 +130,20 @@ export default function Login() {
                 </div>
 
                 <div className="ticker-item">
-                  <span className="text-slate-400 font-semibold text-sm">GOLD</span>
-                  <span className="text-white font-bold text-base ml-2">₹{marketData.gold.value}</span>
+                  <span className="text-slate-400 font-semibold text-sm">GOLD 24K</span>
+                  <span className="text-white font-bold text-base ml-2">₹{marketData.gold24k.value}</span>
                   <span className="text-xs text-slate-500 ml-1">/10g</span>
-                  <span className={`text-sm font-medium ml-2 ${marketData.gold.isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {marketData.gold.change} ({marketData.gold.changePercent})
+                  <span className={`text-sm font-medium ml-2 ${marketData.gold24k.isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {marketData.gold24k.change} ({marketData.gold24k.changePercent})
+                  </span>
+                </div>
+
+                <div className="ticker-item">
+                  <span className="text-slate-400 font-semibold text-sm">GOLD 22K</span>
+                  <span className="text-white font-bold text-base ml-2">₹{marketData.gold22k.value}</span>
+                  <span className="text-xs text-slate-500 ml-1">/10g</span>
+                  <span className={`text-sm font-medium ml-2 ${marketData.gold22k.isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {marketData.gold22k.change} ({marketData.gold22k.changePercent})
                   </span>
                 </div>
 
@@ -187,7 +203,7 @@ export default function Login() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-white">Real-Time Analysis</h3>
-                  <p className="text-sm text-slate-400">Get instant predictions for 1000+ NSE/BSE stocks</p>
+                  <p className="text-sm text-slate-400">Get instant analyses for 1000+ NSE/BSE stocks</p>
                 </div>
               </div>
 
@@ -225,7 +241,7 @@ export default function Login() {
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-white">50% Accuracy</div>
-                  <p className="text-sm text-slate-400">From 146 validated predictions</p>
+                  <p className="text-sm text-slate-400">From 146 validated analyses</p>
                 </div>
               </div>
               <div className="text-xs text-slate-500 mt-2">
@@ -402,7 +418,7 @@ export default function Login() {
 
         .ticker-content {
           display: flex;
-          animation: ticker-scroll 60s linear infinite;
+          animation: ticker-scroll 180s linear infinite;
           will-change: transform;
         }
 
@@ -424,7 +440,7 @@ export default function Login() {
             transform: translateX(0);
           }
           100% {
-            transform: translateX(-33.333%);
+            transform: translateX(-16.666%);
           }
         }
       `}</style>
