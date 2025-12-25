@@ -11,6 +11,21 @@ class FeatureEngineer:
     def create_features(df):
         """Generate comprehensive feature set"""
 
+        # Validate minimum data requirements
+        min_required = 50  # Need at least 50 data points for reliable features
+        if len(df) < min_required:
+            raise ValueError(f"Insufficient data for feature engineering: {len(df)} rows (need at least {min_required})")
+
+        # Also check after basic processing
+        if df[['High', 'Low', 'Close', 'Volume']].isnull().any().any():
+            # If we have some NaN values, try to fill them
+            df = df.fillna(method='ffill').fillna(method='bfill')
+            # Drop any remaining NaN rows
+            df = df.dropna(subset=['High', 'Low', 'Close', 'Volume'])
+
+        if len(df) < 30:  # Minimum after cleaning
+            raise ValueError(f"Insufficient clean data for features: {len(df)} rows (need at least 30)")
+
         # Price-based features
         df['returns'] = df['Close'].pct_change()
         df['log_returns'] = np.log(df['Close'] / df['Close'].shift(1))

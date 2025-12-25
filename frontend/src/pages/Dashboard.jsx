@@ -177,7 +177,7 @@ export default function Dashboard() {
           name: res.data.name || res.data.symbol,
           exchange: res.data.exchange || 'NSE',
           currentPrice: res.data.currentPrice,
-          analyses: res.data.analysis,
+          analyses: res.data.analyses,
           technical: res.data.technical
         };
 
@@ -580,7 +580,7 @@ export default function Dashboard() {
             {/* Price Chart */}
             <RgvPanel>
               <StockChart
-                analyses={selectedStock.analysis}
+                analysis={selectedStock.analyses}
                 currentPrice={selectedStock.currentPrice}
                 symbol={selectedStock.symbol}
               />

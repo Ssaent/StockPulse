@@ -286,6 +286,69 @@ class BacktestingEngine:
             for p in analyses
         ]
 
+    def log_analysis(self, symbol: str, exchange: str, analyses: Dict, current_price: float, model_info: Dict = None):
+        """
+        Log AI analysis predictions to database for backtesting
+
+        Args:
+            symbol: Stock symbol
+            exchange: Exchange (NSE, BSE, etc.)
+            analyses: Dictionary with timeframes (intraday, weekly, monthly) containing target, change, confidence
+            current_price: Current market price
+            model_info: Additional model metadata
+        """
+        from datetime import datetime, timedelta
+
+        # Ensure we have Flask application context
+        if not current_app:
+            raise RuntimeError("No Flask application context available for database operations")
+
+        # Map timeframes to days ahead
+        timeframe_days = {
+            'intraday': 1,
+            'weekly': 5,
+            'monthly': 20
+        }
+
+        prediction_date = datetime.now()
+
+        for timeframe, analysis_data in analyses.items():
+            if timeframe not in timeframe_days:
+                continue
+
+            try:
+                # Calculate target date
+                target_date = prediction_date + timedelta(days=timeframe_days[timeframe])
+
+                # Create analysis log entry
+                features_used = model_info.get('features_used', 28) if model_info else 28
+
+                log_entry = AnalysisLog(
+                    symbol=symbol,
+                    exchange=exchange,
+                    timeframe=timeframe,
+                    predicted_price=analysis_data['target'],
+                    predicted_change_pct=analysis_data['change'],
+                    confidence=analysis_data['confidence'],
+                    current_price_at_prediction=current_price,
+                    target_date=target_date,
+                    features_used=features_used
+                )
+
+                db.session.add(log_entry)
+
+            except Exception as e:
+                print(f"Error logging {timeframe} analysis for {symbol}: {e}")
+                continue
+
+        try:
+            db.session.commit()
+            print(f"Successfully logged analysis for {symbol}")
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error committing analysis logs for {symbol}: {e}")
+            raise
+
     def get_recent_analyses(self, limit: int = 50, timeframe: Optional[str] = None) -> List[Dict]:
         """Alias for get_analysis_history for backward compatibility"""
         return self.get_analysis_history(limit, timeframe)
