@@ -116,11 +116,11 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950 flex items-center justify-center p-4">
-      <div className="max-w-md w-full space-y-8 bg-slate-900/50 backdrop-blur-xl p-8 rounded-2xl border border-slate-700/50 shadow-2xl">
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="max-w-md w-full space-y-8 lightly-luminous p-8">
         {/* Header */}
         <div className="text-center">
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+          <h2 className="text-3xl font-bold text-slate-900">
             Create Account
           </h2>
           <p className="mt-2 text-slate-400">
@@ -272,7 +272,7 @@ const Register = () => {
               Already have an account?{' '}
               <Link
                 to="/login"
-                className="text-blue-400 hover:text-blue-300 font-medium transition-colors"
+                className="text-amber-600 hover:text-amber-500 font-medium material-transition"
               >
                 Sign in
               </Link>

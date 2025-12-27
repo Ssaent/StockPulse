@@ -54,10 +54,10 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="bg-black text-white min-h-screen font-sans overflow-x-hidden">
+    <div className="bg-transparent min-h-screen font-sans overflow-x-hidden">
       {/* Navigation */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrollY > 50 ? 'bg-black/80 backdrop-blur-xl border-b border-white/10' : 'bg-transparent'
+        scrollY > 50 ? 'engineered-glass mx-6 mt-4' : 'bg-transparent'
       }`}>
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           {/* Clickable Logo */}
@@ -70,15 +70,15 @@ export default function LandingPage() {
             <span className="text-xl font-semibold">StockPulse</span>
           </Link>
 
-          <div className="hidden md:flex items-center gap-8 text-sm">
-            <a href="#features" className="hover:text-blue-400 transition-colors">Features</a>
-            <a href="#how-it-works" className="hover:text-blue-400 transition-colors">How it Works</a>
-            <a href="#accuracy" className="hover:text-blue-400 transition-colors">Accuracy</a>
+          <div className="hidden md:flex items-center gap-8 text-sm font-light">
+            <a href="#features" className="text-amber-100 hover:text-amber-50 material-transition">Features</a>
+            <a href="#how-it-works" className="text-amber-100 hover:text-amber-50 material-transition">How it Works</a>
+            <a href="#accuracy" className="text-amber-100 hover:text-amber-50 material-transition">Accuracy</a>
           </div>
 
           <div className="flex items-center gap-4">
-            <Link to="/login" className="text-sm hover:text-blue-400 transition-colors">Sign In</Link>
-            <Link to="/register" className="px-4 py-2 bg-blue-500 rounded-full text-sm font-medium hover:bg-blue-600 transition-all">
+            <Link to="/login" className="text-sm font-light text-amber-100 hover:text-amber-50 material-transition">Sign In</Link>
+            <Link to="/register" className="soft-polymer intelligence-accent px-6 py-2 text-sm">
               Get Started
             </Link>
           </div>
@@ -87,50 +87,62 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
-        {/* Animated gradient background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 via-purple-600/20 to-pink-600/20 opacity-50"
-             style={{ transform: `translateY(${scrollY * 0.5}px)` }} />
+        {/* Mineral Surface Variations - Subtle matte texture shifts */}
+        <div className="absolute inset-0 opacity-8"
+             style={{
+               background:
+                 `radial-gradient(ellipse 35% 25% at 25% 45%, rgba(34, 197, 94, 0.06), transparent),
+                  radial-gradient(ellipse 30% 20% at 75% 65%, rgba(52, 211, 153, 0.04), transparent)`,
+               transform: `translateY(${scrollY * 0.15}px)`
+             }} />
 
-        {/* Grid pattern */}
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:100px_100px]" />
+        {/* Ceramic Grain Pattern - Minimal structural overlay */}
+        <div className="absolute inset-0 opacity-12"
+             style={{
+               backgroundImage: `linear-gradient(rgba(6, 182, 212, 0.015) 1px, transparent 1px),
+                                linear-gradient(90deg, rgba(6, 182, 212, 0.015) 1px, transparent 1px)`,
+               backgroundSize: '120px 120px',
+               transform: `translateY(${scrollY * -0.08}px)`
+             }} />
 
         <div className="relative z-10 max-w-6xl mx-auto px-6 text-center">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 backdrop-blur-xl rounded-full border border-white/10 mb-8 animate-fade-in">
+          {/* Spectral Badge */}
+          <div className="inline-flex items-center gap-2 px-6 py-3 spectral-glass mb-8 animate-fade-in">
             <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
             <span className="text-sm text-gray-300">146 analyses validated • 50% accuracy</span>
           </div>
 
-          {/* Main headline */}
-          <h1 className="text-6xl md:text-8xl font-bold mb-6 leading-tight animate-slide-up">
-            <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-              Analyze Markets
-            </span>
+          {/* Structural Headline */}
+          <h1 className="text-6xl md:text-8xl mb-8 leading-tight animate-slide-up tracking-tight">
+            <span className="text-amber-50">Analyze Markets</span>
             <br />
-            <span className="text-white">With AI Precision</span>
+            <span className="text-amber-100">With AI Precision</span>
           </h1>
 
-          {/* Subheadline */}
-          <p className="text-xl md:text-2xl text-gray-400 mb-12 max-w-3xl mx-auto animate-slide-up-delay">
+          {/* Structural Subheadline */}
+          <p className="text-xl md:text-2xl text-amber-200 mb-12 max-w-3xl mx-auto animate-slide-up-delay leading-relaxed">
             Advanced LSTM neural networks analyze market patterns to give you an edge in stock trading.
             Make informed decisions with real-time AI analysis.
           </p>
 
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16 animate-fade-in-delay">
-            <Link to="/register" className="group px-8 py-4 bg-blue-500 rounded-full font-semibold text-lg hover:bg-blue-600 transition-all hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/50">
+          {/* Primary CTA Buttons */}
+          <div className="flex flex-col sm:flex-row gap-6 justify-center mb-16 animate-fade-in-delay">
+            <Link to="/register" className="soft-polymer intelligence-accent group px-8 py-4 text-lg font-medium">
               Start Analyzing Free
-              <span className="inline-block ml-2 group-hover:translate-x-1 transition-transform">→</span>
+              <span className="inline-block ml-2 group-hover:translate-x-1 physical-hover">→</span>
             </Link>
-            <a href="#demo" className="px-8 py-4 bg-white/5 backdrop-blur-xl rounded-full font-semibold text-lg border border-white/10 hover:bg-white/10 transition-all hover:scale-105">
+            <a href="#demo" className="engineered-glass px-8 py-4 text-lg font-medium physical-hover">
               See Live Demo
             </a>
           </div>
 
-          {/* Live Chart Preview */}
+          {/* Quantum Chart Preview */}
           <div className="relative max-w-4xl mx-auto animate-slide-up-slow">
-            <div className="absolute inset-0 bg-gradient-to-t from-blue-500/20 to-purple-500/20 blur-3xl" />
-            <div className="relative bg-white/5 backdrop-blur-2xl rounded-3xl border border-white/10 p-8 shadow-2xl">
+            <div className="absolute inset-0 opacity-30"
+                 style={{
+                   background: `radial-gradient(ellipse 50% 30% at 50% 50%, rgba(6, 182, 212, 0.1), transparent)`
+                 }} />
+            <div className="relative lightly-luminous p-8">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <div className="text-sm text-gray-400">NIFTY 50</div>
@@ -147,23 +159,23 @@ export default function LandingPage() {
                 <LineChart data={chartData}>
                   <defs>
                     <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="time" stroke="#6b7280" style={{ fontSize: '12px' }} />
                   <YAxis stroke="#6b7280" style={{ fontSize: '12px' }} domain={['dataMin - 50', 'dataMax + 50']} />
-                  <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={3} dot={false} fill="url(#colorValue)" />
+                  <Line type="monotone" dataKey="value" stroke="#06b6d4" strokeWidth={2} dot={false} fill="url(#colorValue)" />
                 </LineChart>
               </ResponsiveContainer>
 
-              <div className="mt-6 flex items-center justify-center gap-6 text-sm text-gray-400">
+              <div className="mt-6 flex items-center justify-center gap-6 text-sm text-amber-200">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                  <div className="w-2 h-2 bg-amber-400 rounded-full" />
                   <span>Real-time data</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full" />
+                  <div className="w-2 h-2 bg-amber-500 rounded-full" />
                   <span>AI analysis</span>
                 </div>
               </div>
@@ -183,8 +195,8 @@ export default function LandingPage() {
       <section id="features" className="py-32 relative">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-20">
-            <h2 className="text-5xl md:text-6xl font-bold mb-6">
-              Built for <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Intelligence</span>
+            <h2 className="text-5xl md:text-6xl mb-6 tracking-tight">
+              Built for <span className="text-amber-100">Intelligence</span>
             </h2>
             <p className="text-xl text-gray-400 max-w-2xl mx-auto">
               Every feature designed to give you the edge in stock market trading
@@ -196,8 +208,8 @@ export default function LandingPage() {
             {features.map((feature, index) => (
               <div
                 key={index}
-                className={`group relative bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-xl rounded-3xl p-8 border border-white/10 transition-all duration-500 hover:scale-105 hover:border-white/20 ${
-                  activeFeature === index ? 'ring-2 ring-blue-500/50' : ''
+                className={`group relative engineered-glass p-8 material-transition ${
+                  activeFeature === index ? 'ring-2 ring-black/50' : ''
                 }`}
                 style={{
                   transform: scrollY > 500 ? 'translateY(0)' : 'translateY(50px)',
@@ -219,7 +231,10 @@ export default function LandingPage() {
 
       {/* Stats Section */}
       <section className="py-32 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-blue-600/10 to-purple-600/10" />
+        <div className="absolute inset-0 opacity-6"
+             style={{
+               background: `radial-gradient(ellipse 45% 30% at 50% 50%, rgba(34, 197, 94, 0.04), transparent)`
+             }} />
 
         <div className="relative max-w-7xl mx-auto px-6">
           <div className="grid md:grid-cols-3 gap-12 text-center">
@@ -279,12 +294,15 @@ export default function LandingPage() {
 
       {/* Final CTA */}
       <section className="py-32 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 via-purple-600/20 to-pink-600/20" />
+        <div className="absolute inset-0 opacity-8"
+             style={{
+               background: `radial-gradient(ellipse 55% 35% at 50% 50%, rgba(52, 211, 153, 0.05), transparent)`
+             }} />
 
         <div className="relative max-w-4xl mx-auto px-6 text-center">
-          <h2 className="text-5xl md:text-7xl font-bold mb-6">
+          <h2 className="text-5xl md:text-7xl font-light mb-6 tracking-tight">
             Ready to start <br />
-            <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-cyan-600 via-emerald-600 to-cyan-600 bg-clip-text text-transparent">
               analyzing?
             </span>
           </h2>
@@ -292,7 +310,7 @@ export default function LandingPage() {
             Join thousands of smart investors using AI to make better trading decisions
           </p>
 
-          <Link to="/register" className="inline-block px-12 py-5 bg-blue-500 rounded-full font-bold text-xl hover:bg-blue-600 transition-all hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/50">
+          <Link to="/register" className="soft-polymer intelligence-accent inline-block px-12 py-5 text-xl font-medium">
             Get Started Free →
           </Link>
 
@@ -303,7 +321,7 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-white/10 py-12">
+      <footer className="border-t border-gray-800/50 py-12">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
             {/* Clickable Footer Logo */}

@@ -182,18 +182,18 @@ export default function Portfolio() {
       />
 
       {/* Header */}
-      <header className="glass border-b border-white/10 sticky top-0 z-50">
+      <header className="engineered-glass border-b border-white/10 sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link to="/dashboard" className="flex items-center gap-2 text-gray-400 hover:text-white">
+          <div className="page-header">
+            <div className="page-header-left">
+              <Link to="/dashboard" className="flex items-center gap-2 text-gray-400 hover:text-white material-transition">
                 <ArrowLeft className="w-5 h-5" />
                 <span>Back</span>
               </Link>
-              <div className="flex items-center gap-2">
-                <Briefcase className="w-6 h-6 text-purple-300" />
-                <h1 className="text-2xl font-bold">Portfolio</h1>
-              </div>
+              <h1 className="page-header-title">
+                <Briefcase className="w-6 h-6 text-amber-400" />
+                Portfolio
+              </h1>
             </div>
 
             <div className="flex items-center gap-2">
@@ -261,7 +261,7 @@ export default function Portfolio() {
                   <div className="flex-1">
                     <div className="flex items-center gap-4 mb-2">
                       <h3 className="text-2xl font-bold">{h.symbol}</h3>
-                      <span className="px-3 py-1 bg-blue-500/20 border border-blue-500/30 rounded-lg text-sm">
+                      <span className="px-3 py-1 bg-amber-500/20 border border-amber-500/30 rounded-lg text-sm">
                         {h.quantity} shares
                       </span>
                     </div>
@@ -471,7 +471,7 @@ function AddHoldingModal({ onClose, onSuccess, onErr }) {
 
               {/* Search Suggestions Dropdown */}
               {showSuggestions && searchResults.length > 0 && (
-                <div className="absolute z-50 mt-2 w-full bg-slate-900 border border-white/20 rounded-lg shadow-2xl max-h-60 overflow-auto">
+                <div className="absolute z-50 mt-2 w-full lightly-luminous rounded-lg shadow-2xl max-h-60 overflow-auto">
                   {searchResults.map((stock) => (
                     <button
                       key={stock.symbol}

@@ -165,7 +165,7 @@ export default function VerifyOTP() {
   }, [otp]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950 relative overflow-hidden p-4">
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
       {/* Animated Background */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Floating elements */}
@@ -230,7 +230,7 @@ export default function VerifyOTP() {
         </div>
 
         {/* Verification Card */}
-        <div className="bg-slate-900/50 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/50 p-8 border border-slate-800">
+        <div className="lightly-luminous p-8">
           {/* Success Message */}
           {success && (
             <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl backdrop-blur-sm">

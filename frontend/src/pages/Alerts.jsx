@@ -143,7 +143,7 @@ export default function Alerts() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
+          <div className="animate-spin w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full mx-auto mb-4" />
           <p className="text-gray-400">Loading alerts...</p>
         </div>
       </div>
@@ -154,17 +154,17 @@ export default function Alerts() {
     <div className="min-h-screen p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-3">
-              <Bell className="w-8 h-8 text-blue-400" />
+        <div className="page-header">
+          <div className="page-header-left">
+            <h1 className="page-header-title">
+              <Bell className="w-8 h-8 text-amber-400" />
               Price Alerts
             </h1>
-            <p className="text-gray-400 mt-2">Get notified when stocks hit your target price</p>
+            <p className="page-header-subtitle">Get notified when stocks hit your target price</p>
           </div>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg font-semibold hover:shadow-lg transition"
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-600 to-amber-700 rounded-lg font-semibold hover:shadow-lg transition"
           >
             <Plus className="w-5 h-5" />
             Create Alert
@@ -200,7 +200,7 @@ export default function Alerts() {
 
                   {/* Search Suggestions Dropdown */}
                   {showSuggestions && searchResults.length > 0 && (
-                    <div className="absolute z-50 mt-2 w-full bg-slate-900 border border-white/20 rounded-lg shadow-2xl max-h-60 overflow-auto">
+                    <div className="absolute z-50 mt-2 w-full lightly-luminous max-h-60 overflow-auto">
                       {searchResults.map((stock) => (
                         <button
                           key={stock.symbol}
@@ -235,7 +235,7 @@ export default function Alerts() {
                       onClick={() => setExchange('NSE')}
                       className={`flex-1 px-4 py-3 rounded-lg border-2 transition font-medium ${
                         exchange === 'NSE'
-                          ? 'bg-blue-500/20 border-blue-500 text-blue-300'
+                          ? 'bg-amber-500/20 border-amber-500 text-amber-300'
                           : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/30'
                       }`}
                       title="National Stock Exchange"
@@ -348,7 +348,7 @@ export default function Alerts() {
             <p className="text-gray-400 mb-6">Create your first alert to get notified about stock movements</p>
             <button
               onClick={() => setShowForm(true)}
-              className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg font-semibold hover:shadow-lg transition"
+              className="px-6 py-3 bg-gradient-to-r from-amber-600 to-amber-700 rounded-lg font-semibold hover:shadow-lg transition"
             >
               Create Your First Alert
             </button>
@@ -381,7 +381,7 @@ export default function Alerts() {
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="text-xl font-bold">{alert.symbol}</h3>
-                        <span className="px-2 py-1 bg-blue-500/20 text-blue-300 text-xs rounded">
+                        <span className="px-2 py-1 bg-amber-500/20 text-amber-300 text-xs rounded">
                           {alert.exchange}
                         </span>
                         <span

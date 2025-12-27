@@ -26,7 +26,7 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950 relative overflow-hidden p-4">
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
       {/* Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-1/4 left-1/4 w-8 h-8 bg-blue-500/20 rounded-full animate-pulse"></div>
@@ -40,28 +40,28 @@ export default function ForgotPassword() {
             to="/"
             className="inline-flex items-center gap-2 mb-6 hover:opacity-80 transition-opacity"
           >
-            <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/50">
+            <div className="w-12 h-12 bg-gradient-to-br from-amber-600 to-amber-700 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/50">
               <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-amber-400 to-amber-500 bg-clip-text text-transparent">
               StockPulse
             </h1>
           </Link>
 
           <div className="mb-6">
-            <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-orange-500/25">
+            <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-500/25">
               <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
             </div>
 
-            <h2 className="text-3xl font-bold text-white mb-2">
+            <h2 className="text-3xl font-bold text-slate-900 mb-2">
               Reset Password
             </h2>
 
-            <p className="text-slate-400">
+            <p className="text-amber-200">
               {step === 'request'
                 ? 'Enter your email to receive reset instructions'
                 : 'Check your email for the reset code'
@@ -71,7 +71,7 @@ export default function ForgotPassword() {
         </div>
 
         {/* Form Card */}
-        <div className="bg-slate-900/50 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/50 p-8 border border-slate-800">
+        <div className="lightly-luminous p-8">
           {error && (
             <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl backdrop-blur-sm">
               <div className="flex items-start gap-3">

@@ -105,52 +105,52 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <div className="min-h-screen flex relative overflow-hidden">
       {/* Smooth Animated Market Ticker at Top */}
-      <div className="absolute top-0 left-0 right-0 bg-slate-900/80 backdrop-blur-sm border-b border-slate-800 z-20 py-3 overflow-hidden">
+      <div className="absolute top-0 left-0 right-0 engineered-glass z-20 py-3 overflow-hidden">
         <div className="ticker-wrapper">
           <div className="ticker-content">
             {/* Six repeats for smoother infinite scroll */}
             {[1, 2, 3, 4, 5, 6].map((set) => (
               <div key={set} className="ticker-item-group">
                 <div className="ticker-item">
-                  <span className="text-slate-400 font-semibold text-sm">NIFTY 50</span>
-                  <span className="text-white font-bold text-base ml-2">{marketData.nifty50.value}</span>
+                  <span className="text-amber-200 font-semibold text-sm">NIFTY 50</span>
+                  <span className="text-amber-50 font-bold text-base ml-2">{marketData.nifty50.value}</span>
                   <span className={`text-sm font-medium ml-2 ${marketData.nifty50.isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
                     {marketData.nifty50.change} ({marketData.nifty50.changePercent})
                   </span>
                 </div>
 
                 <div className="ticker-item">
-                  <span className="text-slate-400 font-semibold text-sm">SENSEX</span>
-                  <span className="text-white font-bold text-base ml-2">{marketData.sensex.value}</span>
+                  <span className="text-amber-200 font-semibold text-sm">SENSEX</span>
+                  <span className="text-amber-50 font-bold text-base ml-2">{marketData.sensex.value}</span>
                   <span className={`text-sm font-medium ml-2 ${marketData.sensex.isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
                     {marketData.sensex.change} ({marketData.sensex.changePercent})
                   </span>
                 </div>
 
                 <div className="ticker-item">
-                  <span className="text-slate-400 font-semibold text-sm">GOLD 24K</span>
-                  <span className="text-white font-bold text-base ml-2">₹{marketData.gold24k.value}</span>
-                  <span className="text-xs text-slate-500 ml-1">/10g</span>
+                  <span className="text-amber-200 font-semibold text-sm">GOLD 24K</span>
+                  <span className="text-amber-50 font-bold text-base ml-2">₹{marketData.gold24k.value}</span>
+                  <span className="text-xs text-amber-300 ml-1">/10g</span>
                   <span className={`text-sm font-medium ml-2 ${marketData.gold24k.isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
                     {marketData.gold24k.change} ({marketData.gold24k.changePercent})
                   </span>
                 </div>
 
                 <div className="ticker-item">
-                  <span className="text-slate-400 font-semibold text-sm">GOLD 22K</span>
-                  <span className="text-white font-bold text-base ml-2">₹{marketData.gold22k.value}</span>
-                  <span className="text-xs text-slate-500 ml-1">/10g</span>
+                  <span className="text-amber-200 font-semibold text-sm">GOLD 22K</span>
+                  <span className="text-amber-50 font-bold text-base ml-2">₹{marketData.gold22k.value}</span>
+                  <span className="text-xs text-amber-300 ml-1">/10g</span>
                   <span className={`text-sm font-medium ml-2 ${marketData.gold22k.isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
                     {marketData.gold22k.change} ({marketData.gold22k.changePercent})
                   </span>
                 </div>
 
                 <div className="ticker-item">
-                  <span className="text-slate-400 font-semibold text-sm">SILVER</span>
-                  <span className="text-white font-bold text-base ml-2">₹{marketData.silver.value}</span>
-                  <span className="text-xs text-slate-500 ml-1">/kg</span>
+                  <span className="text-amber-200 font-semibold text-sm">SILVER</span>
+                  <span className="text-amber-50 font-bold text-base ml-2">₹{marketData.silver.value}</span>
+                  <span className="text-xs text-amber-300 ml-1">/kg</span>
                   <span className={`text-sm font-medium ml-2 ${marketData.silver.isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
                     {marketData.silver.change} ({marketData.silver.changePercent})
                   </span>
@@ -176,21 +176,21 @@ export default function Login() {
               className="flex items-center gap-3 mb-6 hover:opacity-80 transition-opacity cursor-pointer group"
               title="Go to Home"
             >
-              <div className="w-16 h-16 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-indigo-500/50 transform group-hover:scale-110 transition-transform">
+              <div className="w-16 h-16 bg-gradient-to-br from-amber-600 to-amber-700 rounded-2xl flex items-center justify-center shadow-2xl shadow-amber-500/50 transform group-hover:scale-110 transition-transform">
                 <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                 </svg>
               </div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 bg-clip-text text-transparent">
                 StockPulse
               </h1>
             </Link>
 
-            <h2 className="text-3xl font-bold text-white mb-4">
+            <h2 className="text-3xl font-bold text-amber-50 mb-4">
               AI-Powered Stock Predictions
             </h2>
 
-            <p className="text-lg text-slate-400 mb-8">
+            <p className="text-lg text-amber-200 mb-8">
               Join thousands of smart investors using advanced LSTM neural networks to predict market movements.
             </p>
 
@@ -202,8 +202,8 @@ export default function Login() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-white">Real-Time Analysis</h3>
-                  <p className="text-sm text-slate-400">Get instant analyses for 1000+ NSE/BSE stocks</p>
+                  <h3 className="font-semibold text-amber-50">Real-Time Analysis</h3>
+                  <p className="text-sm text-amber-200">Get instant analyses for 1000+ NSE/BSE stocks</p>
                 </div>
               </div>
 
@@ -214,8 +214,8 @@ export default function Login() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-white">Advanced LSTM Models</h3>
-                  <p className="text-sm text-slate-400">Neural networks trained on years of market data</p>
+                  <h3 className="font-semibold text-amber-50">Advanced LSTM Models</h3>
+                  <p className="text-sm text-amber-200">Neural networks trained on years of market data</p>
                 </div>
               </div>
 
@@ -262,23 +262,23 @@ export default function Login() {
               className="inline-flex items-center gap-2 mb-4 hover:opacity-80 transition-opacity cursor-pointer"
               title="Go to Home"
             >
-              <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/50">
+              <div className="w-12 h-12 bg-gradient-to-br from-amber-600 to-amber-700 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/50">
                 <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                 </svg>
               </div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-400 to-amber-500 bg-clip-text text-transparent">
                 StockPulse
               </h1>
             </Link>
-            <p className="text-slate-400">AI-Powered Stock Predictions</p>
+            <p className="text-amber-200">AI-Powered Stock Predictions</p>
           </div>
 
           {/* Login Card */}
-          <div className="bg-slate-900/50 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/50 p-8 border border-slate-800">
+          <div className="lightly-luminous p-8">
             <div className="mb-8">
-              <h2 className="text-3xl font-bold text-white mb-2">Welcome Back!</h2>
-              <p className="text-slate-400">Sign in to access your dashboard</p>
+              <h2 className="text-3xl font-bold text-slate-900 mb-2">Welcome Back!</h2>
+              <p className="text-slate-600">Sign in to access your dashboard</p>
             </div>
 
             {error && (
@@ -305,7 +305,7 @@ export default function Login() {
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Email Address
                 </label>
                 <div className="relative">
@@ -318,7 +318,7 @@ export default function Login() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3.5 bg-slate-800/50 border border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-white placeholder-slate-500 backdrop-blur-sm"
+                    className="w-full pl-12 pr-4 py-3.5 soft-polymer placeholder-amber-400"
                     placeholder="you@example.com"
                     required
                     disabled={loading}
@@ -327,7 +327,7 @@ export default function Login() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Password
                 </label>
                 <div className="relative">
@@ -340,7 +340,7 @@ export default function Login() {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3.5 bg-slate-800/50 border border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-white placeholder-slate-500 backdrop-blur-sm"
+                    className="w-full pl-12 pr-4 py-3.5 soft-polymer placeholder-amber-400"
                     placeholder="••••••••"
                     required
                     disabled={loading}
@@ -364,7 +364,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3.5 px-4 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 transform hover:-translate-y-0.5 active:translate-y-0"
+                className="intelligence-accent w-full py-3.5 px-4 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -381,9 +381,9 @@ export default function Login() {
             </form>
 
             <div className="mt-6 text-center">
-              <p className="text-slate-400">
+              <p className="text-amber-200">
                 Don't have an account?{' '}
-                <Link to="/register" className="font-semibold text-indigo-400 hover:text-indigo-300 transition-colors">
+                <Link to="/register" className="font-semibold text-amber-400 hover:text-amber-300 material-transition">
                   Sign up for free
                 </Link>
               </p>
