@@ -242,6 +242,24 @@ const RgvNamaste = () => { // ✅ REMOVED onComplete prop
             {word}
           </h1>
         )}
+        {/* Green offset ghost */}
+        {stage !== 'void' && (
+          <h1
+            aria-hidden
+            style={{
+              ...titleGhost,
+              color: '#22c55e',
+              transform: `${titleGhost.transform} translate(-6px, -2px)`,
+              textShadow: `
+                0 0 8px rgba(34,197,94,0.6),
+                0 0 24px rgba(34,197,94,0.35)
+              `,
+            }}
+            className={stage === 'climax' ? 'rgv-flicker-hard' : 'rgv-flicker-soft'}
+          >
+            {word}
+          </h1>
+        )}
 
         {/* Red offset ghost */}
         {stage !== 'void' && (
@@ -262,17 +280,6 @@ const RgvNamaste = () => { // ✅ REMOVED onComplete prop
           </h1>
         )}
 
-        {/* Main title with per-letter glitch spans */}
-        <h1
-          style={titleMain}
-          className={stage === 'reveal' ? 'rgv-glitch-in' : stage === 'climax' ? 'rgv-glitch-loop' : ''}
-        >
-          {word.split('').map((ch, i) => (
-            <span key={i} className={`rgv-letter rgv-letter-${i}`}>
-              {ch}
-            </span>
-          ))}
-        </h1>
       </div>
 
       {/* Overlays last */}
