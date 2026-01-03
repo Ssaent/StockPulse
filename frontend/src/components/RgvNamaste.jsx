@@ -280,6 +280,17 @@ const RgvNamaste = () => { // ✅ REMOVED onComplete prop
           </h1>
         )}
 
+        {/* Main title with per-letter glitch spans */}
+        <h1
+          style={titleMain}
+          className={stage === 'reveal' ? 'rgv-glitch-in' : stage === 'climax' ? 'rgv-glitch-loop' : ''}
+        >
+          {word.split('').map((ch, i) => (
+            <span key={i} className={`rgv-letter rgv-letter-${i}`}>
+              {ch}
+            </span>
+          ))}
+        </h1>
       </div>
 
       {/* Overlays last */}

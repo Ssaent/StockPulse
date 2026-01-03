@@ -88,3 +88,5 @@ class CommodityPriceFetcher:
         """Get silver price per kg"""
         data = self.get_gold_silver_prices()
         return data.get('silver', {'value': 74320})
+
+

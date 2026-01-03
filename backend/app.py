@@ -142,13 +142,28 @@ def create_app(config_name=None):
     app.config['JWT_SECRET_KEY'] = config_class.JWT_SECRET_KEY
     app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)
     
-    # Initialize Rate Limiter with environment-based limits
+    # Initialize Rate Limiter with environment-based limits and Redis fallback
     rate_limit_default = config_class.RATE_LIMIT_DEFAULT.split(', ')
+
+    # Try Redis first, fallback to memory if Redis is not available
+    storage_uri = "memory://"  # Default fallback
+    if 'redis://' in config_class.REDIS_URL:
+        try:
+            import redis
+            # Test Redis connection
+            redis_client = redis.from_url(config_class.REDIS_URL)
+            redis_client.ping()  # Test connection
+            storage_uri = config_class.REDIS_URL
+            logger.info("Rate limiter using Redis storage")
+        except (ImportError, redis.ConnectionError) as e:
+            logger.warning(f"Redis not available ({e}), falling back to memory storage")
+            storage_uri = "memory://"
+
     limiter = Limiter(
         app=app,
         key_func=get_remote_address,
         default_limits=rate_limit_default,
-        storage_uri=config_class.REDIS_URL if 'redis://' in config_class.REDIS_URL else "memory://",
+        storage_uri=storage_uri,
         headers_enabled=True,
         strategy="fixed-window"
     )
@@ -296,15 +311,7 @@ def create_app(config_name=None):
             if hist_data is None or hist_data.empty:
                 return None
 
-            try:
-                hist_data = feature_engineer.create_features(hist_data)
-            except ValueError as e:
-                logger.warning(f"Feature engineering failed for {symbol}: {e} - using basic analysis")
-                # Continue with basic features only
-                # Add minimal required columns if missing
-                if 'returns' not in hist_data.columns:
-                    hist_data['returns'] = hist_data['Close'].pct_change()
-                # Skip complex feature engineering, use basic price data
+            hist_data = feature_engineer.create_features(hist_data)
             hist_data = hist_data.dropna()
 
             if len(hist_data) < 100:
@@ -323,26 +330,17 @@ def create_app(config_name=None):
             model_loaded = predictor.load_model(symbol)
 
             if not model_loaded:
-                try:
-                    feature_cols = feature_engineer.select_features()
-                    feature_cols = [f for f in feature_cols if f in hist_data.columns]
-                except:
-                    # Fallback to basic features if selection fails
-                    feature_cols = ['Close', 'Volume', 'High', 'Low', 'Open']
-                    feature_cols = [f for f in feature_cols if f in hist_data.columns]
-                    logger.warning(f"Using basic features for {symbol}: {feature_cols}")
+                feature_cols = feature_engineer.select_features()
+                feature_cols = [f for f in feature_cols if f in hist_data.columns]
 
                 try:
                     predictor.train(hist_data, feature_cols, validation_split=0.2)
                     predictor.save_model(symbol)
-                    # Reload the model to ensure it's in memory
-                    predictor.load_model(symbol)
                 except Exception as e:
-                    logger.warning(f"Training failed for {symbol}: {e} - will attempt prediction with fallback")
-                    # Continue with prediction even if training fails
-                    # The prediction method has built-in fallback logic
+                    logger.error(f"Training failed for {symbol}: {e}", exc_info=True)
+                    return None
 
-            feature_cols = predictor.feature_names if hasattr(predictor, 'feature_names') and predictor.feature_names else feature_cols
+            feature_cols = predictor.feature_names
             try:
                 analysis = predictor.predict_multi_horizon(hist_data, feature_cols, current_price)
             except Exception as e:
