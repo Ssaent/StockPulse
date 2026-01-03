@@ -88,19 +88,35 @@ export default function LandingPage() {
   return (
     <div className="bg-transparent min-h-screen font-sans overflow-x-hidden">
       {/* Navigation */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrollY > 50 ? 'engineered-glass mx-6 mt-4' : 'bg-transparent'
-      }`}>
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          {/* Clickable Logo */}
-          <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer">
+      <nav
+        className="fixed top-0 left-0 right-0 z-50 transition-all duration-700 ease-out"
+        style={{
+          background: `rgba(255, 255, 255, ${Math.min(scrollY / 100, 0.08)})`,
+          backdropFilter: `blur(${Math.min(scrollY / 50, 1) * 20}px)`,
+          border: Math.min(scrollY / 50, 1) > 0.1 ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
+          margin: `${Math.min(scrollY / 50, 1) * 16}px ${Math.min(scrollY / 50, 1) * 24}px`,
+          borderRadius: `${Math.min(scrollY / 50, 1) * 16}px`,
+          boxShadow: Math.min(scrollY / 50, 1) > 0.2 ? `0 8px 32px rgba(0, 0, 0, ${Math.min(scrollY / 50, 1) * 0.3})` : 'none',
+          transform: `scale(${1 + Math.min(scrollY / 100, 1) * -0.02})`
+        }}
+      >
+        <div className="max-w-7xl mx-auto flex items-center justify-between"
+             style={{
+               padding: `${1 + Math.min(scrollY / 50, 1) * 0.5}rem ${1.5 + Math.min(scrollY / 50, 1) * 0.5}rem`,
+               transition: 'padding 0.8s cubic-bezier(0.16, 1, 0.3, 1)'
+             }}>
+          {/* Clickable Logo - Scroll to Top */}
+          <button
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer bg-transparent border-none outline-none"
+          >
             <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             </div>
             <span className="text-xl font-semibold">StockPulse</span>
-          </Link>
+          </button>
 
 
           <div className="flex items-center gap-4">
@@ -115,7 +131,12 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
+      <section
+        className="relative min-h-screen flex items-center justify-center overflow-hidden transition-all duration-700 ease-out"
+        style={{
+          paddingTop: `${5 + Math.min(scrollY / 50, 1) * 1}rem` // Gentler padding adjustment
+        }}
+      >
         {/* Mineral Surface Variations - Subtle matte texture shifts */}
         <div className="absolute inset-0 opacity-8"
              style={{
