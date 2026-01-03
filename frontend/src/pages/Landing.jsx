@@ -104,7 +104,9 @@ export default function LandingPage() {
 
 
           <div className="flex items-center gap-4">
-            <Link to="/login" className="text-sm font-light text-amber-100 hover:text-amber-50 material-transition">Sign In</Link>
+            <Link to="/login" className="soft-polymer intelligence-accent px-6 py-2 text-sm">
+              Sign In
+            </Link>
             <Link to="/register" className="soft-polymer intelligence-accent px-6 py-2 text-sm">
               Get Started
             </Link>
