@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 export default function LandingPage() {
   const [scrollY, setScrollY] = useState(0);
   const [activeFeature, setActiveFeature] = useState(0);
+  const [marketStatus, setMarketStatus] = useState({ isOpen: false, status: 'Closed' });
 
   // Mock chart data
   const chartData = [
@@ -20,23 +21,19 @@ export default function LandingPage() {
   const features = [
     {
       title: "AI-Powered Analysis",
-      description: "Advanced LSTM neural networks analyze years of market data to predict stock movements with precision.",
-      icon: "🤖"
+      description: "Advanced LSTM neural networks analyze years of market data to predict stock movements with precision."
     },
     {
       title: "Real-Time Analysis",
-      description: "Get instant insights on 1000+ NSE/BSE stocks with live market data and technical indicators.",
-      icon: "⚡"
+      description: "Get instant insights on 1000+ NSE/BSE stocks with live market data and technical indicators."
     },
     {
       title: "Smart Alerts",
-      description: "Never miss an opportunity. Set custom alerts and get notified when your targets are hit.",
-      icon: "🔔"
+      description: "Never miss an opportunity. Set custom alerts and get notified when your targets are hit."
     },
     {
       title: "Portfolio Tracking",
-      description: "Monitor your investments with beautiful visualizations and detailed performance metrics.",
-      icon: "📊"
+      description: "Monitor your investments with beautiful visualizations and detailed performance metrics."
     }
   ];
 
@@ -50,6 +47,41 @@ export default function LandingPage() {
     const interval = setInterval(() => {
       setActiveFeature((prev) => (prev + 1) % features.length);
     }, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Function to check market status
+  const checkMarketStatus = () => {
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
+    const istTime = new Date(now.getTime() + istOffset);
+
+    const dayOfWeek = istTime.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    const hours = istTime.getHours();
+    const minutes = istTime.getMinutes();
+
+    // Market is closed on weekends
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      setMarketStatus({ isOpen: false, status: 'Closed' });
+      return;
+    }
+
+    // Market hours: 9:15 AM to 3:30 PM IST
+    const currentMinutes = hours * 60 + minutes;
+    const marketOpenMinutes = 9 * 60 + 15; // 9:15 AM
+    const marketCloseMinutes = 15 * 60 + 30; // 3:30 PM
+
+    const isOpen = currentMinutes >= marketOpenMinutes && currentMinutes <= marketCloseMinutes;
+    setMarketStatus({
+      isOpen,
+      status: isOpen ? 'Live' : 'Closed'
+    });
+  };
+
+  useEffect(() => {
+    checkMarketStatus();
+    // Check every minute
+    const interval = setInterval(checkMarketStatus, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -70,11 +102,6 @@ export default function LandingPage() {
             <span className="text-xl font-semibold">StockPulse</span>
           </Link>
 
-          <div className="hidden md:flex items-center gap-8 text-sm font-light">
-            <a href="#features" className="text-amber-100 hover:text-amber-50 material-transition">Features</a>
-            <a href="#how-it-works" className="text-amber-100 hover:text-amber-50 material-transition">How it Works</a>
-            <a href="#accuracy" className="text-amber-100 hover:text-amber-50 material-transition">Accuracy</a>
-          </div>
 
           <div className="flex items-center gap-4">
             <Link to="/login" className="text-sm font-light text-amber-100 hover:text-amber-50 material-transition">Sign In</Link>
@@ -131,9 +158,9 @@ export default function LandingPage() {
               Start Analyzing Free
               <span className="inline-block ml-2 group-hover:translate-x-1 physical-hover">→</span>
             </Link>
-            <a href="#demo" className="engineered-glass px-8 py-4 text-lg font-medium physical-hover">
-              See Live Demo
-            </a>
+            <Link to="/dashboard" className="engineered-glass px-8 py-4 text-lg font-medium physical-hover">
+              See Live Demo →
+            </Link>
           </div>
 
           {/* Quantum Chart Preview */}
@@ -150,8 +177,10 @@ export default function LandingPage() {
                   <div className="text-sm text-green-400">+125.40 (+0.58%)</div>
                 </div>
                 <div className="flex gap-2">
-                  <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse" />
-                  <span className="text-sm text-gray-400">Live</span>
+                  <div className={`w-3 h-3 rounded-full animate-pulse ${
+                    marketStatus.isOpen ? 'bg-green-400' : 'bg-red-400'
+                  }`} />
+                  <span className="text-sm text-gray-400">{marketStatus.status}</span>
                 </div>
               </div>
 
@@ -180,13 +209,6 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Scroll indicator */}
-          <div className="mt-20 animate-bounce">
-            <svg className="w-6 h-6 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-            </svg>
           </div>
         </div>
       </section>
@@ -217,7 +239,6 @@ export default function LandingPage() {
                   transitionDelay: `${index * 100}ms`
                 }}
               >
-                <div className="text-6xl mb-6">{feature.icon}</div>
                 <h3 className="text-2xl font-bold mb-4">{feature.title}</h3>
                 <p className="text-gray-400 leading-relaxed">{feature.description}</p>
 
