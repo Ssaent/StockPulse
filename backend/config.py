@@ -56,7 +56,7 @@ class Config:
 
 class DevelopmentConfig(Config):
     """Development configuration"""
-    DEBUG = True
+    DEBUG = False  # Temporarily disabled to avoid socket binding issues
     TESTING = False
 
 

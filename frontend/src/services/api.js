@@ -95,6 +95,15 @@ export const corporateAPI = {
     api.get(`/corporate-actions/${symbol}?exchange=${exchange}`),
 };
 
+export const marketAPI = {
+  getLivePrice: (symbol, exchange = 'NSE') =>
+    api.get(`/market/live-price?symbol=${symbol}&exchange=${exchange}`),
+  getChartData: (symbol, exchange = 'NSE', period = '1d', interval = '15m') =>
+    api.get(`/market/chart?symbol=${symbol}&exchange=${exchange}&period=${period}&interval=${interval}`),
+  getIndices: () =>
+    api.get('/market/indices'),
+};
+
 export const backtestAPI = {
   getStats: (timeframe, days = 30) => {
     const params = new URLSearchParams();
@@ -108,4 +117,65 @@ export const backtestAPI = {
     api.post('/backtest/validate'),
 };
 
+// Chart Configuration - Enterprise Grade
+export const CHART_CONFIG = {
+  // Symbol configurations
+  symbols: {
+    nifty: {
+      ticker: '^NSEI',
+      name: 'NIFTY 50',
+      exchange: 'NSE',
+      currency: 'INR',
+      timezone: 'Asia/Kolkata'
+    }
+  },
+
+  // Chart intervals
+  intervals: {
+    intraday: '15m',
+    daily: '1d',
+    weekly: '1wk'
+  },
+
+  // Refresh behavior
+  refresh: {
+    onLoadOnly: true,        // Only fetch on page load
+    manualRefresh: true,     // Allow user to refresh manually
+    backgroundSync: false,   // No continuous polling
+    cacheTimeout: 5 * 60 * 1000  // 5 minutes cache
+  },
+
+  // Styling configuration
+  styling: {
+    colors: {
+      primary: '#06b6d4',
+      tooltip: 'text-cyan-400',
+      error: 'text-red-400',
+      success: 'text-green-400'
+    },
+    animations: {
+      duration: 300,
+      easing: 'cubic-bezier(0.4, 0, 0.2, 1)'
+    }
+  },
+
+  // Error handling
+  errors: {
+    retryAttempts: 3,
+    retryDelay: 1000,  // 1 second base delay
+    timeout: 10000     // 10 second timeout
+  }
+};
+
+// Environment-based API URL
+const getApiUrl = () => {
+  if (typeof window !== 'undefined') {
+    return window.location.hostname === 'localhost'
+      ? 'http://localhost:5000/api'
+      : process.env.REACT_APP_API_URL || 'https://api.stockpulse.com';
+  }
+  return 'http://localhost:5000/api';
+};
+
+export { getApiUrl };
 export default api;

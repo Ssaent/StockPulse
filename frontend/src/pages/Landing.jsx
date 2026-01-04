@@ -1,22 +1,147 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
+import { RefreshCw } from 'lucide-react';
+import { marketAPI, CHART_CONFIG } from '../services/api';
+
+// Enterprise Chart Hook - Big Tech Style
+const useChartData = () => {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(null);
+
+  const fetchData = useCallback(async (showLoading = true) => {
+    try {
+      setLoading(true); // Always show loading for user-initiated refreshes
+      setError(null);
+
+      const symbol = CHART_CONFIG.symbols.nifty;
+      console.log('Fetching chart data for:', symbol.ticker, symbol.exchange);
+      const response = await marketAPI.getChartData(
+        symbol.ticker,
+        symbol.exchange,
+        CHART_CONFIG.intervals.daily,    // '1d' for period
+        CHART_CONFIG.intervals.intraday  // '15m' for interval
+      );
+      console.log('Chart API response:', response);
+
+      // Validate response structure
+      if (!response?.data?.data?.length) {
+        throw new Error('Invalid chart data structure received from server');
+      }
+
+      // Simple data transformation for Recharts
+      const transformedData = response.data.data.map((item, index, array) => ({
+        time: index === array.length - 1 ? '15:30' : item.time,
+        value: item.value
+      }));
+
+      // Basic validation
+      if (!transformedData || transformedData.length === 0) {
+        throw new Error('No chart data available');
+      }
+
+      setData(transformedData);
+      setLastUpdated(new Date());
+
+    } catch (err) {
+      console.error('Chart fetch error:', err.message);
+      setError({
+        message: 'Unable to load chart data. Please check your connection and try again.',
+        code: 'CHART_LOAD_FAILED',
+        timestamp: Date.now(),
+        canRetry: true
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch on mount only (no continuous polling)
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  return { data, error, loading, lastUpdated, refetch: () => fetchData(false) };
+};
+
+// Professional Error Component - Big Tech Style
+const ChartErrorState = ({ error, onRetry }) => {
+  const getErrorIcon = (code) => {
+    switch (code) {
+      case 'NETWORK_ERROR': return '🌐';
+      case 'API_LIMIT': return '⏱️';
+      case 'INVALID_DATA': return '📊';
+      case 'CHART_FETCH_FAILED': return '📈';
+      default: return '⚠️';
+    }
+  };
+
+  const getErrorTitle = (code) => {
+    switch (code) {
+      case 'NETWORK_ERROR': return 'Connection Issue';
+      case 'API_LIMIT': return 'Rate Limited';
+      case 'INVALID_DATA': return 'Data Unavailable';
+      case 'CHART_FETCH_FAILED': return 'Chart Loading Failed';
+      default: return 'Something Went Wrong';
+    }
+  };
+
+  const getErrorMessage = (code) => {
+    switch (code) {
+      case 'NETWORK_ERROR':
+        return 'Unable to connect to market data servers. Please check your internet connection.';
+      case 'API_LIMIT':
+        return 'Too many requests. Our data provider has temporarily limited access. Please try again in a few minutes.';
+      case 'INVALID_DATA':
+        return 'Market data is temporarily unavailable or in an unexpected format.';
+      case 'CHART_FETCH_FAILED':
+        return 'Failed to load the chart data. This could be due to server issues or data unavailability.';
+      default:
+        return 'An unexpected error occurred while loading the chart.';
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center h-64 bg-gray-900/30 backdrop-blur-sm rounded-lg border border-gray-700/50 p-8">
+      <div className="text-5xl mb-4 animate-pulse">{getErrorIcon(error.code)}</div>
+      <h3 className="text-xl font-semibold text-white mb-3">{getErrorTitle(error.code)}</h3>
+      <p className="text-gray-400 text-center mb-6 max-w-md leading-relaxed">
+        {getErrorMessage(error.code)}
+      </p>
+      <div className="flex gap-3">
+        <button
+          onClick={onRetry}
+          className="flex items-center gap-2 px-6 py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-medium transition-all duration-200 hover:shadow-lg hover:shadow-cyan-500/25"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Try Again
+        </button>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-all duration-200"
+        >
+          Reload Page
+        </button>
+      </div>
+      {error.timestamp && (
+        <p className="text-xs text-gray-500 mt-4">
+          Last attempted: {new Date(error.timestamp).toLocaleTimeString()}
+        </p>
+      )}
+    </div>
+  );
+};
 
 export default function LandingPage() {
   const [scrollY, setScrollY] = useState(0);
   const [activeFeature, setActiveFeature] = useState(0);
   const [marketStatus, setMarketStatus] = useState({ isOpen: false, status: 'Closed' });
+  const [currentPrice, setCurrentPrice] = useState({ value: 0, change: 0, changePercent: 0 });
 
-  // Mock chart data
-  const chartData = [
-    { time: '9:00', value: 21800 },
-    { time: '10:00', value: 21850 },
-    { time: '11:00', value: 21820 },
-    { time: '12:00', value: 21900 },
-    { time: '1:00', value: 21950 },
-    { time: '2:00', value: 22000 },
-    { time: '3:00', value: 22100 }
-  ];
+  // Use enterprise chart hook
+  const { data: chartData, error: chartError, loading: chartLoading, lastUpdated, refetch: refetchChart } = useChartData();
 
   const features = [
     {
@@ -49,6 +174,37 @@ export default function LandingPage() {
     }, 4000);
     return () => clearInterval(interval);
   }, []);
+
+  // Fetch market data on load only (enterprise approach)
+  useEffect(() => {
+    const fetchMarketData = async () => {
+      try {
+        const response = await marketAPI.getIndices();
+        if (response?.data?.nifty) {
+          const niftyData = response.data.nifty;
+          setCurrentPrice({
+            value: niftyData.value || 0,
+            change: niftyData.change || 0,
+            changePercent: niftyData.changePercent || 0
+          });
+        } else {
+          throw new Error('Invalid market data structure');
+        }
+      } catch (error) {
+        console.error('Market data fetch failed:', error);
+        // No fallback - let user see zero values or error state
+        setCurrentPrice({ value: 0, change: 0, changePercent: 0 });
+      }
+    };
+
+    fetchMarketData();
+    // No continuous polling - only on page load
+  }, []);
+
+  // Chart refresh handler for manual updates
+  const handleChartRefresh = useCallback(async () => {
+    await refetchChart();
+  }, [refetchChart]);
 
   // Function to check market status
   const checkMarketStatus = () => {
@@ -172,10 +328,10 @@ export default function LandingPage() {
 
           {/* Primary CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-6 justify-center mb-16 animate-fade-in-delay">
-            <Link to="/register" className="soft-polymer intelligence-accent px-12 py-5 text-sm">
+            <Link to="/register" className="soft-polymer px-12 py-5 text-sm">
               Start Analyzing Free
             </Link>
-            <Link to="/dashboard" className="soft-polymer intelligence-accent px-14 py-6 text-sm">
+            <Link to="/dashboard" className="soft-polymer px-12 py-5 text-sm">
               See Live Demo
             </Link>
           </div>
@@ -186,45 +342,109 @@ export default function LandingPage() {
                  style={{
                    background: `radial-gradient(ellipse 50% 30% at 50% 50%, rgba(6, 182, 212, 0.1), transparent)`
                  }} />
-            <div className="relative lightly-luminous p-8">
+            <div className="relative p-8" style={{background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '12px'}}>
+              {/* Chart Header */}
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <div className="text-sm text-gray-400">NIFTY 50</div>
-                  <div className="text-3xl font-bold text-white">21,894.35</div>
-                  <div className="text-sm text-green-400">+125.40 (+0.58%)</div>
+                  <div className="text-sm text-gray-400 mb-3 text-left">{CHART_CONFIG.symbols.nifty.name}</div>
+                  <div className="flex items-baseline gap-3">
+                    <div className="text-3xl font-bold text-white">
+                      {chartData && chartData.length > 0
+                        ? chartData[chartData.length - 1].value.toLocaleString('en-IN')
+                        : (currentPrice.value ? currentPrice.value.toLocaleString('en-IN') : '--')
+                      }
+                    </div>
+                    {currentPrice.change !== 0 && (
+                      <div className={`text-sm ${currentPrice.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {currentPrice.change >= 0 ? '+' : ''}{currentPrice.change.toFixed(2)} ({currentPrice.changePercent >= 0 ? '+' : ''}{currentPrice.changePercent.toFixed(2)}%)
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <div className={`w-3 h-3 rounded-full animate-pulse ${
-                    marketStatus.isOpen ? 'bg-green-400' : 'bg-red-400'
-                  }`} />
-                  <span className="text-sm text-gray-400">{marketStatus.status}</span>
+                <div className="flex items-center gap-4">
+                  {lastUpdated && (
+                    <div className="text-xs text-gray-500">
+                      Updated {lastUpdated.toLocaleTimeString()}
+                    </div>
+                  )}
+                  <button
+                    onClick={handleChartRefresh}
+                    disabled={chartLoading}
+                    className="flex items-center gap-2 px-3 py-1 bg-gray-800/50 hover:bg-gray-700/50 rounded-md text-sm transition-colors disabled:opacity-50"
+                    title="Refresh chart data"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${chartLoading ? 'animate-spin' : ''}`} />
+                  </button>
+                  <div className="flex gap-2">
+                    <div className={`w-3 h-3 rounded-full animate-pulse ${
+                      marketStatus.isOpen ? 'bg-green-400' : 'bg-red-600'
+                    }`} />
+                    <span className="text-sm text-gray-400">{marketStatus.status}</span>
+                  </div>
                 </div>
               </div>
 
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={chartData}>
-                  <defs>
-                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.4}/>
-                      <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="time" stroke="#6b7280" style={{ fontSize: '12px' }} />
-                  <YAxis stroke="#6b7280" style={{ fontSize: '12px' }} domain={['dataMin - 50', 'dataMax + 50']} />
-                  <Line type="monotone" dataKey="value" stroke="#06b6d4" strokeWidth={2} dot={false} fill="url(#colorValue)" />
-                </LineChart>
-              </ResponsiveContainer>
-
-              <div className="mt-6 flex items-center justify-center gap-6 text-sm text-amber-200">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-amber-400 rounded-full" />
-                  <span>Real-time data</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-amber-500 rounded-full" />
-                  <span>AI analysis</span>
-                </div>
-              </div>
+              {/* Chart Content */}
+              {chartError ? (
+                <ChartErrorState error={chartError} onRetry={handleChartRefresh} />
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  {chartLoading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="flex items-center gap-3 text-gray-400">
+                        <div className="w-5 h-5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+                        Loading chart data...
+                      </div>
+                    </div>
+                  ) : chartData && chartData.length > 0 ? (
+                    <LineChart data={chartData}>
+                      <defs>
+                        <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={CHART_CONFIG.styling.colors.primary} stopOpacity={0.4}/>
+                          <stop offset="95%" stopColor={CHART_CONFIG.styling.colors.primary} stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <XAxis
+                        dataKey="time"
+                        stroke="#6b7280"
+                        style={{ fontSize: '12px' }}
+                        tick={{ fill: '#9ca3af' }}
+                      />
+                      <YAxis
+                        stroke="#6b7280"
+                        style={{ fontSize: '12px' }}
+                        domain={['dataMin - 50', 'dataMax + 50']}
+                        tick={{ fill: '#9ca3af' }}
+                        tickFormatter={(value) => value.toLocaleString()}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '8px',
+                          color: '#ffffff',
+                          fontSize: '14px',
+                          fontWeight: 'bold'
+                        }}
+                        labelStyle={{ color: CHART_CONFIG.styling.colors.primary }}
+                        formatter={(value) => [value.toLocaleString('en-IN'), 'Price']}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="value"
+                        stroke={CHART_CONFIG.styling.colors.primary}
+                        strokeWidth={2}
+                        dot={false}
+                        fill="url(#colorValue)"
+                      />
+                    </LineChart>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-400">
+                      No chart data available
+                    </div>
+                  )}
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
         </div>
@@ -247,10 +467,14 @@ export default function LandingPage() {
             {features.map((feature, index) => (
               <div
                 key={index}
-                className={`group relative engineered-glass p-8 material-transition ${
+                className={`group relative p-6 material-transition ${
                   activeFeature === index ? 'ring-2 ring-black/50' : ''
                 }`}
                 style={{
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  borderRadius: '12px',
                   transform: scrollY > 500 ? 'translateY(0)' : 'translateY(50px)',
                   opacity: scrollY > 500 ? 1 : 0,
                   transitionDelay: `${index * 100}ms`

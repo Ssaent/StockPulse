@@ -4,7 +4,7 @@ Provides live NIFTY 50, SENSEX, Gold, and Silver data
 backend/features/market.py
 """
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 import yfinance as yf
 from datetime import datetime
 import pytz
@@ -174,6 +174,126 @@ def get_market_indices():
         traceback.print_exc()
         return jsonify({
             'error': 'Failed to fetch market indices',
+            'message': str(e)
+        }), 500
+
+
+@market_bp.route('/chart', methods=['GET'])
+def get_chart_data():
+    """
+    Get intraday chart data for a specific stock/index
+    Returns time series data for charting
+    """
+    try:
+        symbol = request.args.get('symbol', '^NSEI')  # Default to Nifty 50
+        period = request.args.get('period', '1d')
+        interval = request.args.get('interval', '15m')
+
+        # Map frontend periods to yfinance intervals
+        interval_map = {
+            '1m': '1m',
+            '5m': '5m',
+            '15m': '15m',
+            '30m': '30m',
+            '1h': '1h',
+            '1d': '1d'
+        }
+
+        yf_interval = interval_map.get(interval, '15m')
+
+        # Get intraday chart data
+        ticker = yf.Ticker(symbol)
+        data = ticker.history(period=period, interval=yf_interval)
+
+        if data.empty:
+            return jsonify({
+                'error': 'No data available',
+                'symbol': symbol
+            }), 404
+
+        # Convert to format suitable for frontend charts
+        chart_data = []
+        for timestamp, row in data.iterrows():
+            chart_data.append({
+                'time': timestamp.strftime('%H:%M'),
+                'value': round(float(row['Close']), 2),
+                'open': round(float(row['Open']), 2),
+                'high': round(float(row['High']), 2),
+                'low': round(float(row['Low']), 2),
+                'volume': int(row['Volume'])
+            })
+
+        # Use EXACT same calculation as indices API
+        # Get 2 days of data just like indices API does
+        full_data = ticker.history(period='2d')
+
+        # Use the calculate_change helper function from indices API
+        def calculate_change(data):
+            if len(data) >= 2:
+                current = float(data['Close'].iloc[-1])
+                previous = float(data['Close'].iloc[-2])
+                change = current - previous
+                change_percent = (change / previous) * 100
+                return {
+                    'value': round(current, 2),
+                    'change': round(change, 2),
+                    'changePercent': round(change_percent, 2)
+                }
+            elif len(data) == 1:
+                current = float(data['Close'].iloc[-1])
+                previous = float(data['Open'].iloc[-1])
+                change = current - previous
+                change_percent = (change / previous) * 100 if previous else 0
+                return {
+                    'value': round(current, 2),
+                    'change': round(change, 2),
+                    'changePercent': round(change_percent, 2)
+                }
+            return {'value': 0, 'change': 0, 'changePercent': 0}
+
+        change_data = calculate_change(full_data)
+
+        # Summary with same structure as indices API
+        summary = {
+            'current': change_data['value'],
+            'open': round(float(data['Open'].iloc[0]), 2),
+            'high': round(float(data['High'].max()), 2),
+            'low': round(float(data['Low'].min()), 2),
+            'change': change_data['change'],
+            'changePercent': change_data['changePercent'],
+            'volume': int(data['Volume'].sum())
+        }
+
+        # Add closing price at 15:30 if market is closed and last point is not at 15:30
+        if chart_data and chart_data[-1]['time'] != '15:30':
+            # Use the current price from summary as the closing price
+            closing_price = summary['current']
+            # Use the last data point's high/low/open as fallback
+            last_point = chart_data[-1]
+            chart_data.append({
+                'time': '15:30',
+                'value': closing_price,
+                'open': last_point['value'],  # Use previous close as open for closing candle
+                'high': max(last_point['high'], closing_price),
+                'low': min(last_point['low'], closing_price),
+                'volume': last_point['volume']  # Keep same volume
+            })
+
+        return jsonify({
+            'symbol': symbol,
+            'period': period,
+            'interval': interval,
+            'data': chart_data,
+            'summary': summary,
+            'timestamp': datetime.now(pytz.timezone('Asia/Kolkata')).isoformat()
+        }), 200
+
+    except Exception as e:
+        print(f"Error fetching chart data: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'error': 'Failed to fetch chart data',
             'message': str(e)
         }), 500
 
