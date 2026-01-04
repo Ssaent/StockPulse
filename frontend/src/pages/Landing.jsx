@@ -253,18 +253,19 @@ export default function LandingPage() {
           margin: `${Math.min(scrollY / 50, 1) * 16}px ${Math.min(scrollY / 50, 1) * 24}px`,
           borderRadius: `${Math.min(scrollY / 50, 1) * 16}px`,
           boxShadow: Math.min(scrollY / 50, 1) > 0.2 ? `0 8px 32px rgba(0, 0, 0, ${Math.min(scrollY / 50, 1) * 0.3})` : 'none',
-          transform: `scale(${1 + Math.min(scrollY / 100, 1) * -0.02})`
+          transform: `scale(${1 + Math.min(scrollY / 100, 1) * -0.02})`,
+          maxHeight: '0.75in' // Limit header height to 0.75 inches
         }}
       >
-        <div className="max-w-7xl mx-auto flex items-center justify-between"
+        <div className="max-w-7xl mx-auto flex items-center justify-between h-full"
              style={{
-               padding: `${1 + Math.min(scrollY / 50, 1) * 0.5}rem ${1.5 + Math.min(scrollY / 50, 1) * 0.5}rem`,
+               padding: `${0.5 + Math.min(scrollY / 50, 1) * 0.25}rem ${1 + Math.min(scrollY / 50, 1) * 0.5}rem`,
                transition: 'padding 0.8s cubic-bezier(0.16, 1, 0.3, 1)'
              }}>
           {/* Clickable Logo - Scroll to Top */}
           <button
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer bg-transparent border-none outline-none"
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer bg-transparent border-none outline-none flex-shrink-0"
           >
             <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -276,10 +277,10 @@ export default function LandingPage() {
 
 
           <div className="flex items-center gap-4">
-            <Link to="/login" className="soft-polymer intelligence-accent px-6 py-2 text-sm">
+            <Link to="/login" className="soft-polymer intelligence-accent px-4 py-1.5 text-sm flex items-center justify-center">
               Sign In
             </Link>
-            <Link to="/register" className="soft-polymer intelligence-accent px-8 py-3 text-sm">
+            <Link to="/register" className="soft-polymer intelligence-accent px-6 py-2 text-sm flex items-center justify-center">
               Get Started
             </Link>
           </div>
