@@ -123,7 +123,7 @@ export default function LandingPage() {
             <Link to="/login" className="soft-polymer intelligence-accent px-6 py-2 text-sm">
               Sign In
             </Link>
-            <Link to="/register" className="soft-polymer intelligence-accent px-6 py-2 text-sm">
+            <Link to="/register" className="soft-polymer intelligence-accent px-8 py-3 text-sm">
               Get Started
             </Link>
           </div>
@@ -156,11 +156,6 @@ export default function LandingPage() {
              }} />
 
         <div className="relative z-10 max-w-6xl mx-auto px-6 text-center">
-          {/* Spectral Badge */}
-          <div className="inline-flex items-center gap-2 px-6 py-3 spectral-glass mb-8 animate-fade-in">
-            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            <span className="text-sm text-gray-300">146 analyses validated • 50% accuracy</span>
-          </div>
 
           {/* Structural Headline */}
           <h1 className="text-6xl md:text-8xl mb-8 leading-tight animate-slide-up tracking-tight">
@@ -177,12 +172,11 @@ export default function LandingPage() {
 
           {/* Primary CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-6 justify-center mb-16 animate-fade-in-delay">
-            <Link to="/register" className="soft-polymer intelligence-accent group px-8 py-4 text-lg font-medium">
+            <Link to="/register" className="soft-polymer intelligence-accent px-12 py-5 text-sm">
               Start Analyzing Free
-              <span className="inline-block ml-2 group-hover:translate-x-1 physical-hover">→</span>
             </Link>
-            <Link to="/dashboard" className="engineered-glass px-8 py-4 text-lg font-medium physical-hover">
-              See Live Demo →
+            <Link to="/dashboard" className="soft-polymer intelligence-accent px-14 py-6 text-sm">
+              See Live Demo
             </Link>
           </div>
 
@@ -269,40 +263,6 @@ export default function LandingPage() {
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 to-purple-500/0 group-hover:from-blue-500/10 group-hover:to-purple-500/10 rounded-3xl transition-all duration-500 pointer-events-none" />
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Stats Section */}
-      <section className="py-32 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-6"
-             style={{
-               background: `radial-gradient(ellipse 45% 30% at 50% 50%, rgba(34, 197, 94, 0.04), transparent)`
-             }} />
-
-        <div className="relative max-w-7xl mx-auto px-6">
-          <div className="grid md:grid-cols-3 gap-12 text-center">
-            <div>
-              <div className="text-6xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent mb-4">
-                146+
-              </div>
-              <div className="text-xl text-gray-300">Analyses Validated</div>
-              <div className="text-sm text-gray-500 mt-2">Real-time accuracy tracking</div>
-            </div>
-            <div>
-              <div className="text-6xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-4">
-                1000+
-              </div>
-              <div className="text-xl text-gray-300">Stocks Analyzed</div>
-              <div className="text-sm text-gray-500 mt-2">NSE & BSE coverage</div>
-            </div>
-            <div>
-              <div className="text-6xl font-bold bg-gradient-to-r from-pink-400 to-blue-400 bg-clip-text text-transparent mb-4">
-                50%
-              </div>
-              <div className="text-xl text-gray-300">Analysis Accuracy</div>
-              <div className="text-sm text-gray-500 mt-2">Continuously improving</div>
-            </div>
           </div>
         </div>
       </section>
