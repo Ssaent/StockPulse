@@ -343,7 +343,17 @@ export default function LandingPage() {
                  style={{
                    background: `radial-gradient(ellipse 50% 30% at 50% 50%, rgba(6, 182, 212, 0.1), transparent)`
                  }} />
-            <div className="relative p-8" style={{background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '12px'}}>
+            <div
+              className="relative p-8"
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '12px',
+                outline: 'none'
+              }}
+              onFocus={(e) => e.target.blur()}
+            >
               {/* Chart Header */}
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -389,7 +399,11 @@ export default function LandingPage() {
               {chartError ? (
                 <ChartErrorState error={chartError} onRetry={handleChartRefresh} />
               ) : (
-                <ResponsiveContainer width="100%" height={200}>
+                <ResponsiveContainer
+                  width="100%"
+                  height={200}
+                  style={{ outline: 'none', '&:focus': { outline: 'none' } }}
+                >
                   {chartLoading ? (
                     <div className="flex items-center justify-center h-full">
                       <div className="flex items-center gap-3 text-gray-400">
@@ -408,15 +422,19 @@ export default function LandingPage() {
                       <XAxis
                         dataKey="time"
                         stroke="#6b7280"
-                        style={{ fontSize: '12px' }}
+                        style={{ fontSize: '12px', outline: 'none' }}
                         tick={{ fill: '#9ca3af' }}
+                        axisLine={{ stroke: '#6b7280', strokeWidth: 1 }}
+                        tickLine={{ stroke: '#6b7280', strokeWidth: 1 }}
                       />
                       <YAxis
                         stroke="#6b7280"
-                        style={{ fontSize: '12px' }}
+                        style={{ fontSize: '12px', outline: 'none' }}
                         domain={['dataMin - 50', 'dataMax + 50']}
                         tick={{ fill: '#9ca3af' }}
                         tickFormatter={(value) => value.toLocaleString()}
+                        axisLine={{ stroke: '#6b7280', strokeWidth: 1 }}
+                        tickLine={{ stroke: '#6b7280', strokeWidth: 1 }}
                       />
                       <Tooltip
                         contentStyle={{
