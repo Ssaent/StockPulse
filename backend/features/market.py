@@ -264,8 +264,20 @@ def get_chart_data():
             'volume': int(data['Volume'].sum())
         }
 
-        # Add closing price at 15:30 if market is closed and last point is not at 15:30
-        if chart_data and chart_data[-1]['time'] != '15:30':
+        # Check if market is currently open to determine if we should add closing price
+        from datetime import datetime, timedelta
+        ist_now = datetime.utcnow() + timedelta(hours=5, minutes=30)
+        day_of_week = ist_now.weekday()  # 0=Monday, 6=Sunday
+        current_minutes = ist_now.hour * 60 + ist_now.minute
+        market_open_minutes = 9 * 60 + 15   # 9:15 AM
+        market_close_minutes = 15 * 60 + 30 # 3:30 PM
+
+        is_market_open = (day_of_week < 5 and  # Not weekend
+                         current_minutes >= market_open_minutes and
+                         current_minutes <= market_close_minutes)
+
+        # Only add 15:30 closing price if market is closed AND last point is not already 15:30
+        if not is_market_open and chart_data and chart_data[-1]['time'] != '15:30':
             # Use the current price from summary as the closing price
             closing_price = summary['current']
             # Use the last data point's high/low/open as fallback

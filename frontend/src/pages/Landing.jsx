@@ -31,9 +31,22 @@ const useChartData = () => {
         throw new Error('Invalid chart data structure received from server');
       }
 
+      // Get current market status for conditional time formatting
+      const now = new Date();
+      const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
+      const istTime = new Date(now.getTime() + istOffset);
+      const dayOfWeek = istTime.getDay();
+      const hours = istTime.getHours();
+      const minutes = istTime.getMinutes();
+      const currentMinutes = hours * 60 + minutes;
+      const marketOpenMinutes = 9 * 60 + 15; // 9:15 AM
+      const marketCloseMinutes = 15 * 60 + 30; // 3:30 PM
+      const isMarketOpen = (dayOfWeek >= 1 && dayOfWeek <= 5) &&
+                          (currentMinutes >= marketOpenMinutes && currentMinutes <= marketCloseMinutes);
+
       // Simple data transformation for Recharts
       const transformedData = response.data.data.map((item, index, array) => ({
-        time: index === array.length - 1 ? '15:30' : item.time,
+        time: item.time, // Use actual time from backend, don't force 15:30
         value: item.value
       }));
 
@@ -218,7 +231,7 @@ export default function LandingPage() {
 
     // Market is closed on weekends
     if (dayOfWeek === 0 || dayOfWeek === 6) {
-      setMarketStatus({ isOpen: false, status: 'Closed' });
+      setMarketStatus({ isOpen: false, status: 'Closed (Weekend)' });
       return;
     }
 
@@ -228,9 +241,21 @@ export default function LandingPage() {
     const marketCloseMinutes = 15 * 60 + 30; // 3:30 PM
 
     const isOpen = currentMinutes >= marketOpenMinutes && currentMinutes <= marketCloseMinutes;
+    const status = isOpen ? 'Live' : 'Closed';
+
+    console.log('Market Status Check:', {
+      istTime: istTime.toLocaleString(),
+      dayOfWeek,
+      currentMinutes,
+      marketOpenMinutes,
+      marketCloseMinutes,
+      isOpen,
+      status
+    });
+
     setMarketStatus({
       isOpen,
-      status: isOpen ? 'Live' : 'Closed'
+      status
     });
   };
 
@@ -381,7 +406,7 @@ export default function LandingPage() {
                   <button
                     onClick={handleChartRefresh}
                     disabled={chartLoading}
-                    className="flex items-center gap-2 px-3 py-1 bg-gray-800/50 hover:bg-gray-700/50 rounded-md text-sm transition-colors disabled:opacity-50"
+                    className="soft-polymer flex items-center gap-2 px-3 py-1 text-sm transition-all duration-200 disabled:opacity-50"
                     title="Refresh chart data"
                   >
                     <RefreshCw className={`w-4 h-4 ${chartLoading ? 'animate-spin' : ''}`} />
