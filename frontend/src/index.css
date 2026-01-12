@@ -208,6 +208,23 @@
     transition: all 0.1s ease;
   }
 
+  /* Feature tiles with lighter hover effect */
+  .feature-tile.soft-polymer:hover {
+    background:
+      linear-gradient(145deg,
+        rgba(250, 247, 240, 0.25) 0%,
+        rgba(250, 247, 240, 0.18) 25%,
+        rgba(250, 247, 240, 0.15) 50%,
+        rgba(250, 247, 240, 0.12) 75%,
+        rgba(250, 247, 240, 0.20) 100%
+      ),
+      radial-gradient(circle at 30% 40%,
+        rgba(255, 255, 255, 0.10) 0%,
+        transparent 50%
+      ) !important;
+    border-color: rgba(250, 247, 240, 0.4) !important;
+  }
+
   /* Lightly Luminous - Ultra-Glossy Emissive Surfaces */
   .lightly-luminous {
     background:
