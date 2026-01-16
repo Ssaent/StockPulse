@@ -518,13 +518,12 @@ export default function LandingPage() {
                   transitionDelay: `${index * 100}ms`
                 }}
               >
-                <Link
-                  to="/register"
-                  className="feature-tile group relative p-6 material-transition soft-polymer block h-full flex flex-col"
+                <div
+                  className="feature-tile group relative p-6 material-transition soft-polymer block h-full flex flex-col cursor-default"
                 >
                   <h3 className="text-2xl font-bold mb-4">{feature.title}</h3>
                   <p className="text-gray-400 leading-relaxed flex-grow">{feature.description}</p>
-                </Link>
+                </div>
               </div>
             ))}
           </div>
