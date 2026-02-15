@@ -90,3 +90,4 @@ class CommodityPriceFetcher:
         return data.get('silver', {'value': 74320})
 
 
+

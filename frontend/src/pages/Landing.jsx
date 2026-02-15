@@ -511,19 +511,24 @@ export default function LandingPage() {
             {features.map((feature, index) => (
               <div
                 key={index}
-                className="h-full"
+                className={`group relative p-6 material-transition ${
+                  activeFeature === index ? 'ring-2 ring-black/50' : ''
+                }`}
                 style={{
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  borderRadius: '12px',
                   transform: scrollY > 500 ? 'translateY(0)' : 'translateY(50px)',
                   opacity: scrollY > 500 ? 1 : 0,
                   transitionDelay: `${index * 100}ms`
                 }}
               >
-                <div
-                  className="feature-tile group relative p-6 material-transition soft-polymer block h-full flex flex-col cursor-default"
-                >
-                  <h3 className="text-2xl font-bold mb-4">{feature.title}</h3>
-                  <p className="text-gray-400 leading-relaxed flex-grow">{feature.description}</p>
-                </div>
+                <h3 className="text-2xl font-bold mb-4">{feature.title}</h3>
+                <p className="text-gray-400 leading-relaxed">{feature.description}</p>
+
+                {/* Hover effect */}
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 to-purple-500/0 group-hover:from-blue-500/10 group-hover:to-purple-500/10 rounded-3xl transition-all duration-500 pointer-events-none" />
               </div>
             ))}
           </div>
